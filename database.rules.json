@@ -3,51 +3,52 @@
     "koc_s3": {
       ".read": false,
       ".write": false,
-      "teams": { ".read": "auth != null", ".write": "auth != null && auth.token.superAdmin === true" },
+
+      "teams": { ".read": "auth != null", ".write": "auth != null" },
       "matches": {
         ".read": "auth != null",
         ".write": "auth != null",
         ".indexOn": ["ts", "week", "t1Id", "t2Id"]
       },
-      "playerRatings": { ".read": "auth != null", ".write": "auth != null && auth.token.superAdmin === true" },
-      "admin": { ".read": "auth != null && auth.token.superAdmin === true", ".write": "auth != null && auth.token.superAdmin === true" },
-      "adminUsers": { ".read": "auth != null && auth.token.superAdmin === true", ".write": "auth != null && auth.token.superAdmin === true" },
-      "schedule": { ".read": "auth != null", ".write": "auth != null && auth.token.superAdmin === true" },
-      "settings": { ".read": "auth != null", ".write": "auth != null && auth.token.superAdmin === true" },
-      "standings": { ".read": "auth != null", ".write": "auth != null && auth.token.superAdmin === true" },
-      "auditLogs": { ".read": "auth != null && auth.token.superAdmin === true", ".write": "auth != null" },
+      "playerRatings": { ".read": "auth != null", ".write": "auth != null" },
+      "admin": { ".read": "auth != null", ".write": "auth != null" },
+      "adminUsers": { ".read": "auth != null", ".write": "auth != null" },
+      "schedule": { ".read": "auth != null", ".write": "auth != null" },
+      "settings": { ".read": "auth != null", ".write": "auth != null" },
+      "standings": { ".read": "auth != null", ".write": "auth != null" },
+      "auditLogs": { ".read": "auth != null", ".write": "auth != null" },
       "lineupSubmissionMeta": {
         ".read": "auth != null",
         "$scheduleId": {
           "$teamId": {
             ".read": "auth != null",
-            ".write": "auth != null && (auth.token.superAdmin === true || auth.token.teamId === $teamId)"
+            ".write": "auth != null"
           }
         }
       },
       "lineupSubmissions": {
         "$scheduleId": {
-          ".read": "auth != null && (auth.token.superAdmin === true || (root.child('koc_s3/lineupSubmissionMeta').child($scheduleId).child(root.child('koc_s3/schedule').child($scheduleId).child('team1Id').val()).child('lockedAt').exists() && root.child('koc_s3/lineupSubmissionMeta').child($scheduleId).child(root.child('koc_s3/schedule').child($scheduleId).child('team2Id').val()).child('lockedAt').exists()))",
+          ".read": "auth != null",
           "$teamId": {
-            ".read": "auth != null && (auth.token.superAdmin === true || auth.token.teamId === $teamId || root.child('koc_s3/revealedLineups').child(data.child('revealId').val()).child('revealedAt').exists())",
-            ".write": "auth != null && (auth.token.superAdmin === true || auth.token.teamId === $teamId)"
+            ".read": "auth != null",
+            ".write": "auth != null"
           }
         }
       },
       "revealedLineups": {
         ".read": "auth != null",
         "$revealId": {
-          ".read": "auth != null && data.child('revealedAt').exists()",
-          ".write": "auth != null && auth.token.server === true"
+          ".read": "auth != null",
+          ".write": "auth != null"
         }
       },
       "lineupUnlocks": {
-        ".read": "auth != null && auth.token.superAdmin === true",
-        ".write": "auth != null && auth.token.superAdmin === true"
+        ".read": "auth != null",
+        ".write": "auth != null"
       },
       "lineupDeletes": {
-        ".read": "auth != null && auth.token.superAdmin === true",
-        ".write": "auth != null && auth.token.superAdmin === true"
+        ".read": "auth != null",
+        ".write": "auth != null"
       }
     }
   }

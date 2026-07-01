@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <circle cx="50" cy="50" r="48" fill="#00001a" stroke="#2244cc" stroke-width="2"/>
+  <path d="M50,14 L62,20 L75,18 L80,30 L88,40 L82,52 L86,65 L74,70 L68,82 L55,78 L50,86 L45,78 L32,82 L26,70 L14,65 L18,52 L12,40 L20,30 L25,18 L38,20 Z" fill="#001133" stroke="#2244cc" stroke-width="1.5"/>
+  <circle cx="50" cy="48" r="14" fill="none" stroke="#4466ee" stroke-width="2"/>
+  <line x1="36" y1="48" x2="64" y2="48" stroke="#4466ee" stroke-width="1.5"/>
+  <text x="50" y="80" text-anchor="middle" font-family="Arial Black,sans-serif" font-size="9" font-weight="900" fill="#4466ee">CONQUERORS</text>
+</svg>

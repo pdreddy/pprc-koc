@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <circle cx="50" cy="50" r="48" fill="#1a1000" stroke="#ffcc00" stroke-width="2"/>
+  <path d="M34,30 L40,16 L50,12 L60,16 L66,30" fill="#ffcc00" stroke="#cc9900" stroke-width="1.5" stroke-linejoin="round"/>
+  <ellipse cx="50" cy="52" rx="20" ry="16" fill="#ffcc00" opacity="0.9"/>
+  <ellipse cx="50" cy="52" rx="13" ry="10" fill="#cc9900"/>
+  <ellipse cx="44" cy="49" rx="3" ry="3.5" fill="#1a0800"/>
+  <ellipse cx="56" cy="49" rx="3" ry="3.5" fill="#1a0800"/>
+  <path d="M30,44 Q20,32 28,24 Q36,32 34,44 Z" fill="#ffcc00"/>
+  <path d="M70,44 Q80,32 72,24 Q64,32 66,44 Z" fill="#ffcc00"/>
+  <text x="50" y="82" text-anchor="middle" font-family="Arial Black,sans-serif" font-size="7" font-weight="900" fill="#ffcc00">CHILL SUPER</text>
+  <text x="50" y="91" text-anchor="middle" font-family="Arial Black,sans-serif" font-size="7" font-weight="900" fill="#ffcc00">KINGS</text>
+</svg>

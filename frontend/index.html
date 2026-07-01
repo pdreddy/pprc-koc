@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192x192.png" />
+    <link rel="icon" type="image/svg+xml" href="/logo.svg" />
+    <link rel="shortcut icon" href="/icon-192x192.png" />
+
+    <!-- Viewport: viewport-fit=cover for notch/island support; no user-scalable=no (accessibility) -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+
+    <!-- PWA theme -->
+    <meta name="theme-color" content="#2563eb" />
+    <meta name="color-scheme" content="light" />
+    <meta name="application-name" content="KOC3" />
+
+    <!-- iOS PWA -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="KOC3" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+
+    <!-- Android PWA -->
+    <meta name="mobile-web-app-capable" content="yes" />
+
+    <link rel="preconnect" href="https://koc2-20fb8-default-rtdb.firebaseio.com" />
+    <link rel="preconnect" href="https://firebaseio.com" />
+    <link rel="preconnect" href="https://firebase.googleapis.com" />
+    <link rel="dns-prefetch" href="https://koc2-20fb8-default-rtdb.firebaseio.com" />
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="description" content="KOC3 / PPRC Tennis league app for teams, scores, standings, schedules, ratings, history, and rules." />
+    <title>KOC3 / PPRC Tennis</title>
+  </head>
+  <body>
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <div id="root"></div>
+    <script type="module" src="/src/index.js"></script>
+  </body>
+</html>

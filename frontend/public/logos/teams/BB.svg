@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <circle cx="50" cy="50" r="48" fill="#100020" stroke="#8844ff" stroke-width="2"/>
+  <circle cx="50" cy="50" r="22" fill="#1a0033" stroke="#8844ff" stroke-width="2"/>
+  <circle cx="50" cy="50" r="14" fill="none" stroke="#aa66ff" stroke-width="1.5"/>
+  <line x1="36" y1="50" x2="64" y2="50" stroke="#aa66ff" stroke-width="1.5"/>
+  <line x1="50" y1="28" x2="50" y2="72" stroke="#aa66ff" stroke-width="1.5"/>
+  <circle cx="50" cy="50" r="4" fill="#aa66ff"/>
+  <text x="50" y="86" text-anchor="middle" font-family="Arial Black,sans-serif" font-size="8" font-weight="900" fill="#aa66ff">BASELINE</text>
+  <text x="50" y="95" text-anchor="middle" font-family="Arial Black,sans-serif" font-size="8" font-weight="900" fill="#aa66ff">BASHERS</text>
+</svg>

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <circle cx="50" cy="50" r="48" fill="#1a0000" stroke="#cc2200" stroke-width="2"/>
+  <polygon points="50,12 60,35 85,35 65,52 73,77 50,62 27,77 35,52 15,35 40,35" fill="#cc2200" opacity="0.3"/>
+  <text x="50" y="45" text-anchor="middle" font-family="Arial Black,sans-serif" font-size="22" font-weight="900" fill="#ff4422">KARNA'S</text>
+  <text x="50" y="68" text-anchor="middle" font-family="Arial Black,sans-serif" font-size="18" font-weight="900" fill="#ff6644">CRUSADERS</text>
+</svg>

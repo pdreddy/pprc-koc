@@ -1,0 +1,54 @@
+{
+  "rules": {
+    "koc_s3": {
+      ".read": false,
+      ".write": false,
+      "teams": { ".read": "auth != null", ".write": "auth != null && auth.token.superAdmin === true" },
+      "matches": {
+        ".read": "auth != null",
+        ".write": "auth != null",
+        ".indexOn": ["ts", "week", "t1Id", "t2Id"]
+      },
+      "playerRatings": { ".read": "auth != null", ".write": "auth != null && auth.token.superAdmin === true" },
+      "admin": { ".read": "auth != null && auth.token.superAdmin === true", ".write": "auth != null && auth.token.superAdmin === true" },
+      "adminUsers": { ".read": "auth != null && auth.token.superAdmin === true", ".write": "auth != null && auth.token.superAdmin === true" },
+      "schedule": { ".read": "auth != null", ".write": "auth != null && auth.token.superAdmin === true" },
+      "settings": { ".read": "auth != null", ".write": "auth != null && auth.token.superAdmin === true" },
+      "standings": { ".read": "auth != null", ".write": "auth != null && auth.token.superAdmin === true" },
+      "auditLogs": { ".read": "auth != null && auth.token.superAdmin === true", ".write": "auth != null" },
+      "lineupSubmissionMeta": {
+        ".read": "auth != null",
+        "$scheduleId": {
+          "$teamId": {
+            ".read": "auth != null",
+            ".write": "auth != null && (auth.token.superAdmin === true || auth.token.teamId === $teamId)"
+          }
+        }
+      },
+      "lineupSubmissions": {
+        "$scheduleId": {
+          ".read": "auth != null && (auth.token.superAdmin === true || (root.child('koc_s3/lineupSubmissionMeta').child($scheduleId).child(root.child('koc_s3/schedule').child($scheduleId).child('team1Id').val()).child('lockedAt').exists() && root.child('koc_s3/lineupSubmissionMeta').child($scheduleId).child(root.child('koc_s3/schedule').child($scheduleId).child('team2Id').val()).child('lockedAt').exists()))",
+          "$teamId": {
+            ".read": "auth != null && (auth.token.superAdmin === true || auth.token.teamId === $teamId || root.child('koc_s3/revealedLineups').child(data.child('revealId').val()).child('revealedAt').exists())",
+            ".write": "auth != null && (auth.token.superAdmin === true || auth.token.teamId === $teamId)"
+          }
+        }
+      },
+      "revealedLineups": {
+        ".read": "auth != null",
+        "$revealId": {
+          ".read": "auth != null && data.child('revealedAt').exists()",
+          ".write": "auth != null && auth.token.server === true"
+        }
+      },
+      "lineupUnlocks": {
+        ".read": "auth != null && auth.token.superAdmin === true",
+        ".write": "auth != null && auth.token.superAdmin === true"
+      },
+      "lineupDeletes": {
+        ".read": "auth != null && auth.token.superAdmin === true",
+        ".write": "auth != null && auth.token.superAdmin === true"
+      }
+    }
+  }
+}

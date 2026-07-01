@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 240" role="img" aria-label="KOC Tennis League">
+  <defs>
+    <linearGradient id="shieldGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f59e0b"/>
+      <stop offset="1" stop-color="#d97706"/>
+    </linearGradient>
+    <linearGradient id="goldText" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fde68a"/>
+      <stop offset="1" stop-color="#f59e0b"/>
+    </linearGradient>
+  </defs>
+  <!-- Shield shape -->
+  <path d="M100 8 L192 40 L192 130 Q192 200 100 232 Q8 200 8 130 L8 40 Z" fill="#1a1a2e" stroke="url(#shieldGrad)" stroke-width="4"/>
+  <!-- Inner shield border -->
+  <path d="M100 20 L180 48 L180 130 Q180 192 100 218 Q20 192 20 130 L20 48 Z" fill="none" stroke="#f59e0b" stroke-width="1.5" opacity="0.5"/>
+  <!-- Crown -->
+  <g transform="translate(100,70)">
+    <path d="M-32 0 L-32 20 L32 20 L32 0 L20 -18 L0 -8 L-20 -18 Z" fill="url(#shieldGrad)"/>
+    <circle cx="-32" cy="0" r="5" fill="#fde68a"/>
+    <circle cx="0" cy="-10" r="5" fill="#fde68a"/>
+    <circle cx="32" cy="0" r="5" fill="#fde68a"/>
+    <rect x="-32" y="20" width="64" height="8" rx="2" fill="url(#shieldGrad)"/>
+  </g>
+  <!-- Tennis ball -->
+  <circle cx="100" cy="122" r="22" fill="none" stroke="#f59e0b" stroke-width="2.5"/>
+  <path d="M78 115 Q89 122 78 129" fill="none" stroke="#f59e0b" stroke-width="2"/>
+  <path d="M122 115 Q111 122 122 129" fill="none" stroke="#f59e0b" stroke-width="2"/>
+  <!-- KOC text -->
+  <text x="100" y="158" text-anchor="middle" font-family="Arial Black, sans-serif" font-size="20" font-weight="900" fill="url(#goldText)" letter-spacing="3">KOC</text>
+  <!-- Stars -->
+  <text x="66" y="174" text-anchor="middle" font-size="10" fill="#f59e0b">★</text>
+  <text x="100" y="174" text-anchor="middle" font-size="10" fill="#f59e0b">★</text>
+  <text x="134" y="174" text-anchor="middle" font-size="10" fill="#f59e0b">★</text>
+  <!-- TENNIS LEAGUE -->
+  <text x="100" y="190" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#fde68a" letter-spacing="2">TENNIS LEAGUE</text>
+  <!-- EST. 2024 -->
+  <text x="100" y="205" text-anchor="middle" font-family="Arial, sans-serif" font-size="7" fill="#d97706" letter-spacing="1">EST. 2024</text>
+</svg>

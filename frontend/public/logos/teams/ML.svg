@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <circle cx="50" cy="50" r="48" fill="#1a1000" stroke="#ffaa00" stroke-width="2"/>
+  <ellipse cx="50" cy="48" rx="20" ry="16" fill="#ffaa00" opacity="0.9"/>
+  <ellipse cx="50" cy="48" rx="13" ry="10" fill="#cc7700"/>
+  <path d="M30,42 Q20,30 28,22 Q36,30 34,42 Z" fill="#ffaa00"/>
+  <path d="M70,42 Q80,30 72,22 Q64,30 66,42 Z" fill="#ffaa00"/>
+  <ellipse cx="44" cy="46" rx="3" ry="3.5" fill="#1a0800"/>
+  <ellipse cx="56" cy="46" rx="3" ry="3.5" fill="#1a0800"/>
+  <path d="M44,54 Q50,58 56,54" stroke="#1a0800" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+  <text x="50" y="82" text-anchor="middle" font-family="Arial Black,sans-serif" font-size="10" font-weight="900" fill="#ffaa00">MEGA LIONS</text>
+</svg>

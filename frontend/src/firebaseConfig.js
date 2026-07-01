@@ -5,13 +5,14 @@ function envOrDefault(viteKey, fallback) {
 }
 
 export const firebaseConfig = {
-  apiKey:            envOrDefault('VITE_FIREBASE_API_KEY',             'AIzaSyDbO0eP52i4t3V94bEiDcl7WoKbSrrM9VA'),
-  authDomain:        envOrDefault('VITE_FIREBASE_AUTH_DOMAIN',         'koc2-20fb8.firebaseapp.com'),
-  databaseURL:       envOrDefault('VITE_FIREBASE_DATABASE_URL',        'https://koc2-20fb8-default-rtdb.firebaseio.com'),
-  projectId:         envOrDefault('VITE_FIREBASE_PROJECT_ID',          'koc2-20fb8'),
-  storageBucket:     envOrDefault('VITE_FIREBASE_STORAGE_BUCKET',      'koc2-20fb8.firebasestorage.app'),
-  messagingSenderId: envOrDefault('VITE_FIREBASE_MESSAGING_SENDER_ID', '317734341461'),
-  appId:             envOrDefault('VITE_FIREBASE_APP_ID',              '1:317734341461:web:1bcad5a1792fac0e46bddc'),
+  apiKey:            envOrDefault('VITE_FIREBASE_API_KEY',             'AIzaSyDS6hY6aJwCUJDKncGBP_5t6C7MBQP8oT4'),
+  authDomain:        envOrDefault('VITE_FIREBASE_AUTH_DOMAIN',         'koc3-f4203.firebaseapp.com'),
+  databaseURL:       envOrDefault('VITE_FIREBASE_DATABASE_URL',        'https://koc3-f4203-default-rtdb.firebaseio.com'),
+  projectId:         envOrDefault('VITE_FIREBASE_PROJECT_ID',          'koc3-f4203'),
+  storageBucket:     envOrDefault('VITE_FIREBASE_STORAGE_BUCKET',      'koc3-f4203.firebasestorage.app'),
+  messagingSenderId: envOrDefault('VITE_FIREBASE_MESSAGING_SENDER_ID', '821260737390'),
+  appId:             envOrDefault('VITE_FIREBASE_APP_ID',              '1:821260737390:web:7927bd7ebf1d2f4d15bf7f'),
+  measurementId:     envOrDefault('VITE_FIREBASE_MEASUREMENT_ID',      'G-271218KTHL'),
 };
 
 export const firebaseAppName = 'koc3-app';

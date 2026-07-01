@@ -103,6 +103,7 @@ function Shell() {
   const lastRefreshed              = useAppStore(s => s.lastRefreshed);
   const settings                   = useAppStore(s => s.settings);
   const loaded                     = useAppStore(s => s.loaded);
+  const connectionError            = useAppStore(s => s.connectionError);
 
   // Write to Zustand store
   const setTeams                       = useAppStore(s => s.setTeams);
@@ -117,6 +118,7 @@ function Shell() {
   const setSettings                    = useAppStore(s => s.setSettings);
   const setLoaded                      = useAppStore(s => s.setLoaded);
   const touchLastRefreshed             = useAppStore(s => s.touchLastRefreshed);
+  const setConnectionError             = useAppStore(s => s.setConnectionError);
 
   const visibleLineupSubmissions = useMemo(() => {
     const merged = Object.fromEntries(Object.entries(lineupSubmissionMeta || {}).map(([scheduleId, submissions]) => [scheduleId, { ...(submissions || {}) }]));
@@ -252,28 +254,39 @@ function Shell() {
 
   // Public data subscriptions — stable for the lifetime of the app; session changes must not tear these down
   useEffect(() => {
+    // Surfaces read failures (e.g. Firebase Auth misconfigured, so rules reject
+    // unauthenticated reads) as a visible banner instead of an infinite silent spinner.
+    const onSubscriptionError = (error) => {
+      console.error('Failed to read from database', error);
+      setConnectionError(
+        error?.code === 'PERMISSION_DENIED'
+          ? 'Unable to load data: access was denied. This app requires Firebase Anonymous Authentication to be enabled for this project.'
+          : 'Unable to load data. Please check your connection and try again.'
+      );
+    };
     ensureAuth();
     const unsubT = onValue(ref(db, PATHS.teams), (snap) => {
       startTransition(() => {
         setTeams(canonicalizeTeamsData(snap.val() || {}));
         setLoaded(true);
+        setConnectionError(null);
       });
-    });
+    }, onSubscriptionError);
     const unsubM = onValue(ref(db, PATHS.matches), (snap) => {
       const data = snap.val() || {};
       const list = Object.entries(data).map(([id, m]) => ({ id, ...m }));
       list.sort((a, b) => (b.ts || 0) - (a.ts || 0));
       startTransition(() => setMatches(list));
-    });
+    }, onSubscriptionError);
     const unsubA = onValue(ref(db, PATHS.admin), (snap) => {
       startTransition(() => setAdminConfig(prev => ({ ...prev, ...(snap.val() || { password: '' }) })));
-    });
+    }, onSubscriptionError);
     const unsubAU = onValue(ref(db, PATHS.adminUsers), (snap) => {
       startTransition(() => setAdminConfig(prev => ({ ...prev, users: snap.val() || {} })));
-    });
+    }, onSubscriptionError);
     const unsubS = onValue(ref(db, PATHS.schedule), (snap) => {
       startTransition(() => setSchedule(snap.val() || {}));
-    });
+    }, onSubscriptionError);
     const unsubLineups = onValue(ref(db, PATHS.lineupSubmissionMeta), (snap) => {
       startTransition(() => {
         setLineupSubmissionMeta(snap.val() || {});
@@ -345,7 +358,8 @@ function Shell() {
 
   return (
     <ChromeWrapper>
-      {!loaded && <PageSpinner />}
+      {connectionError && <div className="error-box" role="alert" data-testid="connection-error-banner">{connectionError}</div>}
+      {!loaded && !connectionError && <PageSpinner />}
       <Suspense fallback={<PageSpinner />}>
         <Routes>
           <Route path="/" element={<Home teams={deferredTeams} schedule={deferredSchedule} matches={deferredMatches} eligibilityRules={settings.eligibilityRules} lineupSubmissions={deferredLineups} revealedLineups={deferredRevealedLineups} lastRefreshed={lastRefreshed} onRefresh={handleRefresh} />} />

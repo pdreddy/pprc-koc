@@ -18,6 +18,7 @@ const useAppStore = create((set) => ({
   settings: {},
   loaded: false,
   lastRefreshed: 0,
+  connectionError: null,
 
   // ── Setters (called by Shell's Firebase onValue callbacks) ────────────
   setTeams:   (teams)   => set({ teams }),
@@ -36,6 +37,7 @@ const useAppStore = create((set) => ({
   setSettings: (settings) => set({ settings }),
   setLoaded:   (loaded)   => set({ loaded }),
   setLastRefreshed: (lastRefreshed) => set({ lastRefreshed }),
+  setConnectionError: (connectionError) => set({ connectionError }),
   touchLastRefreshed: () => set({ lastRefreshed: Date.now() }),
 }));
 
@@ -54,3 +56,4 @@ export const selectLineupSubmissionMeta = (s) => s.lineupSubmissionMeta;
 export const selectRevealedScheduleSubmissions = (s) => s.revealedScheduleSubmissions;
 export const selectRevealedLineups = (s) => s.revealedLineups;
 export const selectLastRefreshed = (s) => s.lastRefreshed;
+export const selectConnectionError = (s) => s.connectionError;

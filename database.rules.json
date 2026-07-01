@@ -16,7 +16,7 @@
       "schedule": { ".read": "auth != null", ".write": "auth != null" },
       "settings": { ".read": "auth != null", ".write": "auth != null" },
       "standings": { ".read": "auth != null", ".write": "auth != null" },
-      "auditLogs": { ".read": "auth != null", ".write": "auth != null" },
+      "auditLogs": { ".read": "auth != null", ".write": "auth != null", ".indexOn": ["timestamp"] },
       "lineupSubmissionMeta": {
         ".read": "auth != null",
         "$scheduleId": {

@@ -197,9 +197,13 @@ function Shell() {
           }
         }
 
-        // Admin password
-        if (!aSnap.exists()) {
-          await set(ref(db, PATHS.admin), { password: DEFAULT_ADMIN_PASSWORD });
+        // Admin password — seed the legacy shared password whenever it (and its
+        // superAdminPassword override) are both missing, not just when the whole
+        // node is absent, so a partially-written admin node can't permanently
+        // lock everyone out of the admin login.
+        const adminData = aSnap.val() || {};
+        if (!adminData.password && !adminData.superAdminPassword) {
+          await update(ref(db, PATHS.admin), { password: DEFAULT_ADMIN_PASSWORD });
         }
 
         // Admin users

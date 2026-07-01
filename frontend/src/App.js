@@ -278,12 +278,15 @@ function Shell() {
       list.sort((a, b) => (b.ts || 0) - (a.ts || 0));
       startTransition(() => setMatches(list));
     }, onSubscriptionError);
+    // admin/adminUsers require a superAdmin custom claim that nothing in this app
+    // currently mints on the anonymous auth token, so permission-denied here is the
+    // expected outcome for every session — do not surface it as a connection error.
     const unsubA = onValue(ref(db, PATHS.admin), (snap) => {
       startTransition(() => setAdminConfig(prev => ({ ...prev, ...(snap.val() || { password: '' }) })));
-    }, onSubscriptionError);
+    });
     const unsubAU = onValue(ref(db, PATHS.adminUsers), (snap) => {
       startTransition(() => setAdminConfig(prev => ({ ...prev, users: snap.val() || {} })));
-    }, onSubscriptionError);
+    });
     const unsubS = onValue(ref(db, PATHS.schedule), (snap) => {
       startTransition(() => setSchedule(snap.val() || {}));
     }, onSubscriptionError);

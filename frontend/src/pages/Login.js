@@ -45,9 +45,9 @@ export default function Login({ teams, adminConfig }) {
           ? String(adminConfig?.superAdminPassword || adminConfig?.password || '').trim()
           : String(adminConfig?.adminPassword || adminConfig?.password || '').trim();
         const allowedPasswords = [configuredUser?.password, ...(configuredUser?.passwords || []), rolePassword].map(value => String(value || '').trim()).filter(Boolean);
-        if (!allowedPasswords[0]) { setError('Admin password not configured yet.'); return; }
         const recoveryPin = RECOVERY_PINS[adminRole];
         const usedPin = recoveryPin && password.trim() === recoveryPin;
+        if (!usedPin && !allowedPasswords[0]) { setError('Admin password not configured yet.'); return; }
         if (usedPin || allowedPasswords.includes(password.trim())) {
           const nextSession = { role: adminRole, userId: username || adminRole, name: adminUser?.name || username || adminRole, loginAt: Date.now(), loginViaPin: usedPin };
           loginAdmin(adminRole, { username: nextSession.userId, name: nextSession.name, loginViaPin: usedPin });

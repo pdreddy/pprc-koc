@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { ref, set, update, remove, push, onValue, get } from 'firebase/database';
-import { db, PATHS } from '../firebase';
+import { collection, doc, limit, onSnapshot, orderBy, query, setDoc } from 'firebase/firestore';
+import { db, PATHS, firestoreDb } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { ScoreProcessingService } from '../services/ScoreProcessingService';
 import { buildScheduleFor8x2 } from '../utils/roundRobin';
@@ -11,6 +12,8 @@ import { canDeleteMatch, canEditTeams, canManageSettings } from '../utils/roles'
 import { buildUtrRatingsTable } from '../data/utrRatings';
 import { auctionPlayerRatingUpdates, buildAuctionPlayerRatingsTable } from '../data/auctionPlayers';
 import TeamLogo from '../components/TeamLogo';
+import { useSendWhatsApp } from '../hooks/useSendWhatsApp';
+import { NOTIFICATION_TEMPLATES } from '../services/notifications/NotificationTemplates';
 
 function firebaseObjectToList(data, source) {
   if (!data) return [];
@@ -543,6 +546,100 @@ function AdminLineupManager({ teams, schedule, lineupSubmissions, revealedLineup
   );
 }
 
+function NotificationsAdmin({ teams = {}, settings = {} }) {
+  const { sendWhatsApp, busy, error } = useSendWhatsApp();
+  const [enabled, setEnabled] = useState(false);
+  const [testPhone, setTestPhone] = useState('');
+  const [testMessage, setTestMessage] = useState('KOC notification test message.');
+  const [logs, setLogs] = useState([]);
+  const [msg, setMsg] = useState('');
+  const templateEntries = Object.entries(NOTIFICATION_TEMPLATES);
+
+  useEffect(() => {
+    const unsubConfig = onSnapshot(doc(firestoreDb, 'notifications', 'config'), snap => {
+      setEnabled(!!snap.data()?.enableWhatsApp);
+    });
+    const logsQuery = query(collection(firestoreDb, 'notification_logs'), orderBy('createdAt', 'desc'), limit(25));
+    const unsubLogs = onSnapshot(logsQuery, snap => setLogs(snap.docs.map(row => ({ id: row.id, ...row.data() }))), () => setLogs([]));
+    return () => { unsubConfig(); unsubLogs(); };
+  }, []);
+
+  const saveConfig = async (nextEnabled) => {
+    setMsg('');
+    try {
+      await setDoc(doc(firestoreDb, 'notifications', 'config'), {
+        enableWhatsApp: nextEnabled,
+        enableEmail: false,
+        enablePush: false,
+        enableSMS: false,
+        clubId: settings.clubId || 'pprc',
+        tournamentId: settings.tournamentId || 'koc_s3',
+        retryAttempts: 3,
+        timeoutMs: 10000,
+        updatedAt: Date.now()
+      }, { merge: true });
+      setMsg(`✅ WhatsApp ${nextEnabled ? 'enabled' : 'disabled'}`);
+    } catch (e) {
+      setMsg('Save failed: ' + e.message);
+    }
+  };
+
+  const sendTest = async () => {
+    setMsg('');
+    const result = await sendWhatsApp({
+      type: 'TEST_MESSAGE',
+      recipient: { phone: testPhone, name: 'Admin Test' },
+      message: testMessage,
+      variables: { player: 'Admin Test', club: settings.clubName || 'PPRC' },
+      tournamentId: settings.tournamentId || 'koc_s3',
+      clubId: settings.clubId || 'pprc'
+    });
+    setMsg(result.success ? `✅ Sent test WhatsApp${result.metaMessageId ? ` (${result.metaMessageId})` : ''}` : `Send failed: ${result.error}`);
+  };
+
+  const captains = Object.values(teams).map(team => ({ team, captain: (team.players || []).find(p => p.isCaptain) || team.players?.[0] })).filter(row => row.captain);
+
+  return (
+    <div data-testid="admin-notifications">
+      {msg && <div className={msg.startsWith('✅') ? 'success-box' : 'error-box'}>{msg}</div>}
+      {error && <div className="error-box">{error}</div>}
+      <div className="card">
+        <h2>🔔 Notifications</h2>
+        <p className="hint">Provider-independent notification controls. WhatsApp sends through the secure Cloud Function; tokens are never exposed to the browser.</p>
+        <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap', marginTop: '.65rem' }}>
+          <button className={`btn small ${enabled ? 'success' : ''}`} onClick={() => saveConfig(true)} disabled={busy}>Enable WhatsApp</button>
+          <button className="btn small ghost" onClick={() => saveConfig(false)} disabled={busy}>Disable WhatsApp</button>
+          <span className={`tag ${enabled ? 'win' : 'lose'}`}>{enabled ? 'Enabled' : 'Disabled'}</span>
+        </div>
+      </div>
+
+      <div className="card">
+        <h2>📲 Send Test Message</h2>
+        <div className="field"><div className="field-label">Phone (E.164 preferred)</div><input className="input" value={testPhone} onChange={e => setTestPhone(e.target.value)} placeholder="+15551234567" /></div>
+        <div className="field"><div className="field-label">Message</div><textarea className="textarea" value={testMessage} onChange={e => setTestMessage(e.target.value)} /></div>
+        <button className="btn full" onClick={sendTest} disabled={busy || !testPhone.trim()}>Send Test WhatsApp</button>
+      </div>
+
+      <div className="card">
+        <h2>🧩 Templates</h2>
+        <div style={{ display: 'grid', gap: '.55rem' }}>{templateEntries.map(([key, value]) => <div key={key} className="match-line"><strong>{key}</strong><div className="hint" style={{ whiteSpace: 'pre-line' }}>{value}</div></div>)}</div>
+      </div>
+
+      <div className="card">
+        <h2>👥 Captain Messaging</h2>
+        <p className="hint">Add captain phone numbers to team/player records to send messages here.</p>
+        <div style={{ display: 'grid', gap: '.45rem' }}>{captains.map(({ team, captain }) => <div key={team.id} className="rl-item"><span className="rl-ic">💬</span><div style={{ flex: 1 }}><strong>{captain.name}</strong><div className="hint">{team.name} · {captain.phone || team.phone || 'No phone on file'}</div></div><button className="btn small" disabled={busy || !(captain.phone || team.phone)} onClick={() => sendWhatsApp({ type: 'CAPTAIN_MESSAGE', recipient: { phone: captain.phone || team.phone, name: captain.name, teamId: team.id }, message: `Hello ${captain.name}, this is a KOC captain notification.`, variables: { captain: captain.name, team: team.name, club: 'PPRC' } })}>Send WhatsApp</button></div>)}</div>
+      </div>
+
+      <div className="card">
+        <h2>📜 Notification History</h2>
+        {logs.length === 0 && <div className="center muted">No notification logs yet.</div>}
+        {logs.map(log => <div key={log.id} className="match-hist"><div className="teams">{log.channel} · {log.status}</div><div className="meta"><small>{log.phone || 'No phone'} · {log.template || 'CUSTOM'}</small><small>{log.createdAt?.toDate ? log.createdAt.toDate().toLocaleString() : '—'}</small></div>{log.error && <div className="error-box" style={{ marginTop: '.5rem' }}>{log.error}</div>}<div className="lines">{log.message}</div></div>)}
+      </div>
+    </div>
+  );
+}
+
 export default function Admin({ teams, adminConfig, matches, schedule, lineupSubmissions = {}, revealedLineups = {}, settings = {} }) {
   const [tab, setTab] = useState('teams');
   const [legacyMatches, setLegacyMatches] = useState([]);
@@ -643,6 +740,7 @@ export default function Admin({ teams, adminConfig, matches, schedule, lineupSub
         <button className={`tab ${tab === 'teams' ? 'active' : ''}`} onClick={() => setTab('teams')} data-testid="admin-tab-teams">Teams</button>
         {isSuperAdmin && <button className={`tab ${tab === 'schedule' ? 'active' : ''}`} onClick={() => setTab('schedule')} data-testid="admin-tab-schedule">Schedule</button>}
         {(isSuperAdmin || session?.loginViaPin) && <button className={`tab ${tab === 'settings' ? 'active' : ''}`} onClick={() => setTab('settings')} data-testid="admin-tab-settings">Settings</button>}
+        {isSuperAdmin && <button className={`tab ${tab === 'notifications' ? 'active' : ''}`} onClick={() => setTab('notifications')} data-testid="admin-tab-notifications">Notifications</button>}
         {isSuperAdmin && <button className={`tab ${tab === 'passwords' ? 'active' : ''}`} onClick={() => setTab('passwords')} data-testid="admin-tab-passwords">Passwords</button>}
       </div>
 
@@ -656,6 +754,8 @@ export default function Admin({ teams, adminConfig, matches, schedule, lineupSub
       {tab === 'schedule' && <ScheduleEditor schedule={schedule} teams={teams} />}
 
       {tab === 'lineups' && <AdminLineupManager teams={teams} schedule={schedule} lineupSubmissions={lineupSubmissions} revealedLineups={revealedLineups} />}
+
+      {tab === 'notifications' && <NotificationsAdmin teams={teams} settings={settings} />}
 
       {tab === 'passwords' && (
         <div className="card">

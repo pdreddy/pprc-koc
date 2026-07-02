@@ -2,6 +2,8 @@ import { getApps, initializeApp } from 'firebase/app';
 import { initializeAppCheck, ReCaptchaV3Provider } from 'firebase/app-check';
 import { getAuth, signInAnonymously } from 'firebase/auth';
 import { getDatabase } from 'firebase/database';
+import { getFunctions } from 'firebase/functions';
+import { getFirestore } from 'firebase/firestore';
 
 import { firebaseAppName, firebaseConfig } from './firebaseConfig';
 import { PATHS } from './firebasePaths';
@@ -44,6 +46,8 @@ if (appCheckSiteKey) {
 
 export const auth = getAuth(app);
 export const db = getDatabase(app, databaseURL);
+export const firestoreDb = getFirestore(app);
+export const firebaseFunctions = getFunctions(app);
 
 let authPromise = null;
 export function ensureAuth() {

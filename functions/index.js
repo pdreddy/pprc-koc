@@ -179,3 +179,7 @@ exports.revealLineupsOnLock = functions.database
     await writeSystemLineupAudit(root, { actionType: 'Lineups Revealed', scheduleId, teamId: 'both', metadata: { revealId, revealCode: revealRecord.revealCode, revealedAt: now, lastUpdatedAt: now } });
     return null;
   });
+
+const notifications = require('./src/notifications/sendWhatsApp');
+exports.sendWhatsAppMessage = notifications.sendWhatsAppMessage;
+exports.scheduledNotificationSweep = notifications.scheduledNotificationSweep;

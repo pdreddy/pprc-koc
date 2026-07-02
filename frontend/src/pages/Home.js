@@ -10,6 +10,7 @@ import { approvedMatches } from '../utils/matchStatus';
 import { resolveMatchTeams, lineWinnerSide } from '../utils/matchTeams';
 import { CaptainCapacityCard, buildCaptainCapacityRows } from '../components/CaptainCapacity';
 import TeamLogo from '../components/TeamLogo';
+import { useSendWhatsApp } from '../hooks/useSendWhatsApp';
 
 function formatDate(iso) {
   if (!iso) return 'TBD';
@@ -316,6 +317,7 @@ const CaptainFixtureCard = React.memo(function CaptainFixtureCard({ item, teams,
   const [message, setMessage] = useState('');
   const [selectionWarning, setSelectionWarning] = useState('');
   const [showOpponentCapacity, setShowOpponentCapacity] = useState(false);
+  const { sendWhatsApp, busy: notifyBusy } = useSendWhatsApp();
   const { team1, team2 } = fixtureTeams(item, teams);
   const opponent = item.team1Id === captainTeam.id ? team2 : team1;
   const locked = !!lineupSubmission?.lockedAt && !lineupSubmission?.unlockedAt;
@@ -328,6 +330,28 @@ const CaptainFixtureCard = React.memo(function CaptainFixtureCard({ item, teams,
   const canSubmit = !completed && !locked && errors.length === 0;
   const waText = whatsappMessage(item, captainTeam, opponent, captainTeam?.players?.find(p => p.isCaptain)?.name || captainTeam?.players?.[0]?.name || session.teamName, lineupSubmission, opponentSubmission, revealedLineup);
   const waHref = `https://wa.me/?text=${encodeURIComponent(waText)}`;
+  const captain = captainTeam?.players?.find(p => p.isCaptain) || captainTeam?.players?.[0] || {};
+  const captainPhone = captain.phone || captainTeam?.phone || '';
+
+  const sendReminder = async (type) => {
+    const result = await sendWhatsApp({
+      type,
+      recipient: { phone: captainPhone, name: captain.name, teamId: captainTeam.id },
+      variables: {
+        captain: captain.name || session.teamName,
+        team: captainTeam.name,
+        opponent: opponent?.name || 'Opponent',
+        court: item.court || 'TBD',
+        date: formatDate(item.date),
+        time: item.time || 'TBD',
+        deadline: `${formatDate(item.date)} ${item.time || ''}`.trim(),
+        club: 'PPRC'
+      },
+      tournamentId: 'koc_s3',
+      clubId: 'pprc'
+    });
+    setMessage(result.success ? '✅ Reminder sent' : `Reminder failed: ${result.error}`);
+  };
 
   useEffect(() => {
     if (lineupSubmission?.selected) setSelected(lineupSubmission.selected);
@@ -488,6 +512,9 @@ const CaptainFixtureCard = React.memo(function CaptainFixtureCard({ item, teams,
                 ? <Link className="btn small cfc-btn-score" to={scoreEntryHref(item, revealedLineup, lineupSubmission)} data-testid={`submit-score-${item.id}`}>Submit Score</Link>
                 : <button type="button" className="btn small ghost cfc-btn-score-disabled" disabled title="Waiting for both lineups to be revealed" data-testid={`submit-score-${item.id}`}>Submit Score</button>}
           <button type="button" className="btn small cfc-btn-capacity" onClick={() => setShowOpponentCapacity(v => !v)} data-testid={`toggle-opponent-capacity-${item.id}`}>{showOpponentCapacity ? 'Hide Opponent Capacity' : 'Show Opponent Capacity'}</button>
+          <button type="button" className="btn small ghost" onClick={() => sendReminder('LINEUP_REMINDER')} disabled={notifyBusy || !captainPhone} data-testid={`send-lineup-reminder-${item.id}`}>Lineup Reminder</button>
+          <button type="button" className="btn small ghost" onClick={() => sendReminder('SCORE_REMINDER')} disabled={notifyBusy || !captainPhone} data-testid={`send-score-reminder-${item.id}`}>Score Reminder</button>
+          <button type="button" className="btn small ghost" onClick={() => sendReminder('MATCH_REMINDER')} disabled={notifyBusy || !captainPhone} data-testid={`send-match-reminder-${item.id}`}>Match Reminder</button>
         </div>
       </div>
       {showOpponentCapacity && <OpponentCapacityPreview opponent={opponent} teams={teams} matches={matches} eligibilityRules={eligibilityRules} lineupSubmissions={{ [item.id]: { [opponent?.id]: opponentSubmission } }} />}

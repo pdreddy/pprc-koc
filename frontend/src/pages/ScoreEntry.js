@@ -188,7 +188,7 @@ function ShareResultPreview({ text, compact = false }) {
     <div className={compact ? 'share-preview-panel' : 'card'} data-testid="result-share-preview">
       <h2>📤 WhatsApp-friendly result preview</h2>
       <pre className="hint" style={{ whiteSpace: 'pre-wrap', margin: 0 }}>{text}</pre>
-      <div className="row" style={{ marginTop: '.8rem' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.5rem', alignItems: 'center', marginTop: '.8rem' }}>
         <button type="button" className="btn small" onClick={copyText} data-testid="copy-result-preview">
           {copied ? 'Copied!' : 'Copy preview'}
         </button>

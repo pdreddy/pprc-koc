@@ -451,7 +451,8 @@ table.std .pts { font-weight: 900; color: var(--ink); }
   box-shadow: var(--shadow-card);
 }
 .match-hist .teams { font-weight: 800; color: var(--ink); }
-.match-hist .meta { display: flex; justify-content: space-between; align-items: center; margin-top: 0.3rem; }
+.match-hist .meta { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: .3rem; margin-top: 0.3rem; }
+.match-hist .meta > * { min-width: 0; }
 .match-hist .meta small { color: var(--muted); font-size: 0.72rem; }
 .match-hist .lines { margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px dashed var(--border); font-size: 0.82rem; color: var(--ink2); }
 .match-hist .lines .ln { padding: 0.3rem 0; }
@@ -1276,8 +1277,7 @@ main.container,
 button, .btn, .bottom-nav a, select, input, textarea { -webkit-tap-highlight-color: transparent; }
 .btn { -webkit-appearance: none; appearance: none; white-space: nowrap; touch-action: manipulation; }
 .bottom-nav a { text-decoration: none; touch-action: manipulation; user-select: none; -webkit-user-select: none; }
-.dashboard-section-head > div:first-child,
-.captain-fixture-main > div:first-child { flex: 1 1 360px; min-width: 0; }
+.dashboard-section-title { flex: 1 1 360px; min-width: 0; }
 .captain-fixture-main { justify-content: space-between; align-items: flex-start; }
 .captain-fixture-actions { margin-left: auto; max-width: 100%; }
 .score-lineup-loader h2 { margin-bottom: .35rem; }
@@ -3352,8 +3352,7 @@ table.std { min-width: 420px !important; }
 
 /* ── 3. dashboard section head flex-basis: don't force 360px on small screens ── */
 @media (max-width: 600px) {
-  .dashboard-section-head > div:first-child,
-  .captain-fixture-main > div:first-child { flex: 1 1 0 !important; min-width: 0 !important; }
+  .dashboard-section-title { flex: 1 1 0 !important; min-width: 0 !important; }
 }
 
 /* ── 4. Home nav grid: 2 columns even on 320px phones ── */
@@ -3365,7 +3364,7 @@ table.std { min-width: 420px !important; }
 /* ── 5. Standings team cell: shrink on phones ── */
 @media (max-width: 600px) {
   .standing-team-cell { min-width: 80px !important; }
-  .standing-team-cell span { max-width: 80px !important; }
+  .standing-team-names small { max-width: 72px !important; }
 }
 
 /* ── 6. Login form: reduce padding on very small phones ── */

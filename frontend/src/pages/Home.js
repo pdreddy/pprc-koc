@@ -839,7 +839,7 @@ function CaptainScheduleList({ fixtures, completedFixtures, teams, captainTeam, 
   return (
     <section className="card" data-testid="captain-scheduled-matches-card">
       <div className="dashboard-section-head">
-        <div><h2>Scheduled Matches</h2><p className="hint">Submit and lock one official lineup per match schedule ID.</p></div>
+        <div className="dashboard-section-title"><h2>Scheduled Matches</h2><p className="hint">Submit and lock one official lineup per match schedule ID.</p></div>
         <div className="dashboard-refresh"><button className="btn small ghost" onClick={onRefresh}>Refresh</button><span className="hint">Last Refreshed {timeLabel(lastRefreshed)}</span></div>
       </div>
       {fixtures.length === 0 ? <div className="muted center">No scheduled matches found for your team.</div> : (

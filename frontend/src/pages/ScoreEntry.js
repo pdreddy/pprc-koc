@@ -1508,19 +1508,19 @@ function FormEntry({ teams, matches, schedule, lineupSubmissions, revealedLineup
               <p className="hint" style={{ marginTop: '.4rem', marginBottom: 0 }}>Removes this result and its standings/ratings updates so it can be re-entered below.</p>
             </div>
           ) : (
-            <p className="hint" style={{ marginTop: '.75rem', marginBottom: 0 }}>Contact an admin if this score needs to be corrected.</p>
+            <p className="hint" style={{ marginTop: '.75rem', marginBottom: 0 }}>This score has already been submitted and can't be submitted again. Contact a Super Admin if it needs to be corrected.</p>
           )}
         </div>
       )}
 
-      {team1 && team2 && !scoreBlocked && submittedLineupFixtures.length === 0 && (
+      {team1 && team2 && !scoreBlocked && !existingMatch && submittedLineupFixtures.length === 0 && (
         <div className="card score-lineup-loader" data-testid="form-score-lineup-pending">
-          <h2>Official lineup pending</h2>
+          <h2>Lineups Not Submitted</h2>
           <p className="hint">Score lines are loaded only after both captains submit and lock their dashboard lineups. Manual lineup selection is no longer available on Score Entry.</p>
         </div>
       )}
 
-      {team1 && team2 && !scoreBlocked && courts.map((c, idx) => {
+      {team1 && team2 && !scoreBlocked && !existingMatch && courts.map((c, idx) => {
         const status = courtCompletion(c);
         const result = computeCourt(c);
         const winnerName = result.winnerTeamNum === 1 ? team1.name : (result.winnerTeamNum === 2 ? team2.name : 'Winner pending');

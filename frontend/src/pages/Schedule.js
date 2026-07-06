@@ -113,6 +113,7 @@ function MatchRow({ m, t1, t2, isCompleted, lineupReady, scoreReady, lineupOpen,
         }}>
           <div>{weekdayShort(m.date)}</div>
           <div style={{ color: 'var(--ink)', fontSize: '.7rem', marginTop: 1 }}>{m.time}</div>
+          {m.location && <div style={{ color: 'var(--muted)', fontSize: '.62rem', marginTop: 1 }}>📍{m.location}</div>}
         </div>
         <div style={{ flex: 1, fontSize: '.82rem', lineHeight: 1.3, minWidth: 0 }}>
           <div className="team-logo-line" style={{ fontWeight: 800 }}>

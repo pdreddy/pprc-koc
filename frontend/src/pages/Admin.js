@@ -306,7 +306,7 @@ function ScheduleEditor({ schedule, teams }) {
   const saveMatch = async (m) => {
     const draft = editing[m.id] || {};
     const updates = {};
-    ['date', 'time', 'team1Id', 'team2Id', 'status', 'group', 'round'].forEach(k => {
+    ['date', 'time', 'location', 'team1Id', 'team2Id', 'status', 'group', 'round'].forEach(k => {
       if (draft[k] !== undefined && draft[k] !== m[k]) updates[k] = draft[k];
     });
     if (Object.keys(updates).length === 0) { setMsg('Nothing to save'); return; }
@@ -333,6 +333,7 @@ function ScheduleEditor({ schedule, teams }) {
       round: 1,
       date: new Date().toISOString().slice(0, 10),
       time: '7:15 PM',
+      location: '',
       team1Id: teamList[0].id,
       team2Id: teamList[1].id,
       status: 'scheduled',
@@ -412,6 +413,9 @@ function ScheduleEditor({ schedule, teams }) {
                       <option value="completed">completed</option>
                       <option value="cancelled">cancelled</option>
                     </select>
+                  </div>
+                  <div style={{ display: 'flex', gap: '.35rem', marginBottom: '.35rem' }}>
+                    <input className="input" value={get('location') || ''} onChange={e => setDraft(m.id, { location: e.target.value })} placeholder="Location" data-testid={`admin-fixture-${m.id}-location`} style={{ flex: 1 }} />
                   </div>
                   <div style={{ display: 'flex', gap: '.35rem', marginBottom: '.35rem' }}>
                     <select className="select" value={get('team1Id')} onChange={e => setDraft(m.id, { team1Id: e.target.value })} data-testid={`admin-fixture-${m.id}-t1`} style={{ flex: 1 }}>

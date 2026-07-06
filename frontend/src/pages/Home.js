@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ref, update } from 'firebase/database';
 import { db, ensureAuth, PATHS } from '../firebase';
-import { recordLineupAudit } from '../services/AuditService';
+import { recordLineupAudit, writeAuditLog } from '../services/AuditService';
 import { useAuth } from '../contexts/AuthContext';
 import { ROLES, hasRole } from '../utils/roles';
 import { DEFAULT_ELIGIBILITY_RULES, normalizeEligibilityRules } from '../utils/eligibilityRules';
@@ -228,7 +228,7 @@ function whatsappMessage(fixture, team, opponent, captainName, mySubmission, opp
   const revealedAt = revealedLineup?.revealedAt || mySubmission?.revealedAt || opponentSubmission?.revealedAt || (mySubmission?.lockedAt && opponentSubmission?.lockedAt ? Math.max(mySubmission.lockedAt, opponentSubmission.lockedAt) : null);
   const group = fixture?.group || leftTeam?.group || rightTeam?.group || '—';
   const highlightedRows = rows.split('\n').map(row => row.replace(/^([^:]+):/, '*$1:*')).join('\n');
-  return `🏆 *KOC Match Lineups*\n*Group ${group} · Round ${fixture?.round || '—'}*\n📅 ${formatDate(fixture?.date)} · ${fixture?.time || 'TBD'}\n\n🔥 *${leftTeamName} vs ${rightTeamName}*\n\n👤 *Captain sharing:*\n${captainName || 'Captain'}\n\n✅ *Official lines revealed*\n${highlightedRows}\n\n⏱️ *Submission timeline*\n• *${leftTeamName} submitted:* ${dateTimeLabel(leftSubmission?.submittedAt || leftSubmission?.lockedAt)}\n• *${rightTeamName} submitted:* ${dateTimeLabel(rightSubmission?.submittedAt || rightSubmission?.lockedAt)}\n• *Final reveal:* ${dateTimeLabel(revealedAt)}\n\n🔑 *Schedule ID:* ${fixture?.id || '—'}\n📌 _The KOC App is the official source of truth for these lineups._`;
+  return `🏆 *KOC Match Lineups*\n*Group ${group} · Round ${fixture?.round || '—'}*\n📅 ${formatDate(fixture?.date)} · ${fixture?.time || 'TBD'}\n📍 ${fixture?.location || 'Location TBD'}\n\n🔥 *${leftTeamName} vs ${rightTeamName}*\n\n👤 *Captain sharing:*\n${captainName || 'Captain'}\n\n✅ *Official lines revealed*\n${highlightedRows}\n\n⏱️ *Submission timeline*\n• *${leftTeamName} submitted:* ${dateTimeLabel(leftSubmission?.submittedAt || leftSubmission?.lockedAt)}\n• *${rightTeamName} submitted:* ${dateTimeLabel(rightSubmission?.submittedAt || rightSubmission?.lockedAt)}\n• *Final reveal:* ${dateTimeLabel(revealedAt)}\n\n🔑 *Schedule ID:* ${fixture?.id || '—'}\n📌 _The KOC App is the official source of truth for these lineups._`;
 }
 
 function scoreEntryHref(fixture, revealedLineup, lineupSubmission) {
@@ -316,6 +316,11 @@ const CaptainFixtureCard = React.memo(function CaptainFixtureCard({ item, teams,
   const [message, setMessage] = useState('');
   const [selectionWarning, setSelectionWarning] = useState('');
   const [showOpponentCapacity, setShowOpponentCapacity] = useState(false);
+  const [editingSchedule, setEditingSchedule] = useState(false);
+  const [timeDraft, setTimeDraft] = useState(item.time || '');
+  const [locationDraft, setLocationDraft] = useState(item.location || '');
+  const [scheduleSaving, setScheduleSaving] = useState(false);
+  const [scheduleMessage, setScheduleMessage] = useState('');
   const { team1, team2 } = fixtureTeams(item, teams);
   const opponent = item.team1Id === captainTeam.id ? team2 : team1;
   const locked = !!lineupSubmission?.lockedAt && !lineupSubmission?.unlockedAt;
@@ -332,6 +337,13 @@ const CaptainFixtureCard = React.memo(function CaptainFixtureCard({ item, teams,
   useEffect(() => {
     if (lineupSubmission?.selected) setSelected(lineupSubmission.selected);
   }, [lineupSubmission?.selected]);
+
+  useEffect(() => {
+    if (!editingSchedule) {
+      setTimeDraft(item.time || '');
+      setLocationDraft(item.location || '');
+    }
+  }, [item.time, item.location, editingSchedule]);
 
   const optionErrors = useMemo(() => {
     const map = {};
@@ -448,6 +460,32 @@ const CaptainFixtureCard = React.memo(function CaptainFixtureCard({ item, teams,
     }
   };
 
+  const saveScheduleDetails = async () => {
+    const nextTime = timeDraft.trim();
+    const nextLocation = locationDraft.trim();
+    setScheduleSaving(true);
+    setScheduleMessage('');
+    try {
+      await ensureAuth();
+      await update(ref(db, `${PATHS.schedule}/${item.id}`), { time: nextTime, location: nextLocation });
+      await writeAuditLog({
+        actionType: 'Fixture Time/Location Edited',
+        session,
+        targetType: 'schedule',
+        targetId: item.id,
+        oldValue: { time: item.time || '', location: item.location || '' },
+        newValue: { time: nextTime, location: nextLocation }
+      });
+      setEditingSchedule(false);
+      setScheduleMessage('✅ Time & location updated');
+      onRefresh();
+    } catch (e) {
+      setScheduleMessage(`Save failed: ${e.message}`);
+    } finally {
+      setScheduleSaving(false);
+    }
+  };
+
   const markWhatsappShared = async () => {
     const now = Date.now();
     try {
@@ -464,7 +502,29 @@ const CaptainFixtureCard = React.memo(function CaptainFixtureCard({ item, teams,
       <div className="captain-fixture-main">
         <span className="cfc-cal-icon" aria-hidden="true">📅</span>
         <div className="cfc-info">
-          <div className="cfc-round">Round {item.round || '—'} · {formatDate(item.date)} · {item.time || 'TBD'}</div>
+          <div className="cfc-round">Round {item.round || '—'} · {formatDate(item.date)} · {item.time || 'TBD'} · 📍 {item.location || 'Location TBD'}</div>
+          {!completed && (
+            editingSchedule ? (
+              <div className="cfc-schedule-edit" data-testid={`edit-schedule-form-${item.id}`}>
+                <label className="field">
+                  <div className="field-label">Time</div>
+                  <input className="input" value={timeDraft} onChange={e => setTimeDraft(e.target.value)} placeholder="e.g. 7:15 PM" disabled={scheduleSaving} data-testid={`edit-schedule-time-${item.id}`} />
+                </label>
+                <label className="field">
+                  <div className="field-label">Location</div>
+                  <input className="input" value={locationDraft} onChange={e => setLocationDraft(e.target.value)} placeholder="Court / venue address" disabled={scheduleSaving} data-testid={`edit-schedule-location-${item.id}`} />
+                </label>
+                <div style={{ display: 'flex', gap: '.4rem', marginTop: '.35rem' }}>
+                  <button type="button" className="btn small success" onClick={saveScheduleDetails} disabled={scheduleSaving} data-testid={`save-schedule-${item.id}`}>{scheduleSaving ? 'Saving...' : 'Save'}</button>
+                  <button type="button" className="btn small ghost" onClick={() => { setEditingSchedule(false); setTimeDraft(item.time || ''); setLocationDraft(item.location || ''); }} disabled={scheduleSaving}>Cancel</button>
+                </div>
+                {scheduleMessage && <div className={scheduleMessage.startsWith('✅') ? 'success-box' : 'error-box'} style={{ marginTop: '.35rem' }}>{scheduleMessage}</div>}
+              </div>
+            ) : (
+              <button type="button" className="btn small ghost cfc-btn-edit-schedule" onClick={() => setEditingSchedule(true)} data-testid={`edit-schedule-${item.id}`}>✏️ Edit time/location</button>
+            )
+          )}
+          {scheduleMessage && !editingSchedule && <div className={scheduleMessage.startsWith('✅') ? 'success-box' : 'error-box'} style={{ marginTop: '.35rem' }}>{scheduleMessage}</div>}
           <div className="cfc-teams">{team1?.name || 'TBD'} <strong>vs</strong> {team2?.name || 'TBD'} <span className="cfc-group">· Group {item.group || team1?.group || team2?.group || '—'}</span></div>
           <div className="cfc-status-row">
             <span className={status.className}>{status.label}</span>

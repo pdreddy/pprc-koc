@@ -3454,6 +3454,11 @@ table.std { min-width: 420px !important; }
 .cfc-status-row { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; margin-top: .4rem; }
 .cfc-opp-status { font-size: .78rem; color: var(--muted); }
 
+/* Captain time/location edit */
+.cfc-btn-edit-schedule { margin: .3rem 0 .1rem; padding: .2rem .55rem !important; font-size: .72rem !important; }
+.cfc-schedule-edit { display: flex; flex-wrap: wrap; gap: .5rem; align-items: flex-end; margin: .35rem 0; padding: .5rem; border-radius: 8px; background: rgba(37,99,235,.06); }
+.cfc-schedule-edit .field { flex: 1 1 140px; min-width: 120px; }
+
 /* Action buttons */
 .cfc-btn-lines {
   background: linear-gradient(135deg, #7c3aed, #6d28d9) !important;

@@ -12,6 +12,7 @@ import { DEFAULT_ELIGIBILITY_RULES, normalizeEligibilityRules } from '../utils/e
 import { parseQuickScore } from '../utils/quickScoreParser';
 import { regularSetWinner, validateLineScore } from '../utils/tennisScoreRules';
 import TeamLogo from '../components/TeamLogo';
+import { WhatsAppShareButton } from '../components/WhatsAppIcon';
 
 // Quick Paste is kept as a legacy/migration parser path only; Score Entry mounts the form workflow by default.
 const QUICK_PASTE_ENABLED = false;
@@ -191,9 +192,7 @@ function ShareResultPreview({ text, compact = false }) {
         <button type="button" className="btn small" onClick={copyText} data-testid="copy-result-preview">
           {copied ? 'Copied!' : 'Copy preview'}
         </button>
-        <a className="btn small success" href={whatsappHref} target="_blank" rel="noreferrer" data-testid="whatsapp-result-share">
-          Share on WhatsApp
-        </a>
+        <WhatsAppShareButton href={whatsappHref} label="Share on WhatsApp" testId="whatsapp-result-share" />
       </div>
     </div>
   );

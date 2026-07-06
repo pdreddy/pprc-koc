@@ -10,6 +10,7 @@ import { approvedMatches } from '../utils/matchStatus';
 import { resolveMatchTeams, lineWinnerSide } from '../utils/matchTeams';
 import { CaptainCapacityCard, buildCaptainCapacityRows } from '../components/CaptainCapacity';
 import TeamLogo from '../components/TeamLogo';
+import { WhatsAppShareButton } from '../components/WhatsAppIcon';
 
 function formatDate(iso) {
   if (!iso) return 'TBD';
@@ -60,16 +61,6 @@ const LINEUP_STATUS = {
   completed: { label: '⚫ Completed', className: 'lineup-status completed' }
 };
 
-
-function WhatsAppIcon() {
-  return (
-    <span className="whatsapp-icon" aria-hidden="true">
-      <svg viewBox="0 0 32 32" focusable="false" role="img">
-        <path d="M16 3.2A12.5 12.5 0 0 0 5.4 22.3L4 28.8l6.7-1.4A12.5 12.5 0 1 0 16 3.2Zm0 22.5c-1.8 0-3.6-.5-5.1-1.4l-.4-.2-3.4.7.7-3.3-.3-.5A9.8 9.8 0 1 1 16 25.7Zm5.5-7.3c-.3-.2-1.8-.9-2.1-1-.3-.1-.5-.2-.7.2-.2.3-.8 1-.9 1.2-.2.2-.3.2-.6.1-.3-.2-1.2-.4-2.3-1.4-.9-.8-1.4-1.7-1.6-2-.2-.3 0-.5.1-.6l.5-.6c.2-.2.2-.3.3-.5.1-.2 0-.4 0-.6-.1-.2-.7-1.7-1-2.3-.3-.6-.5-.5-.7-.5h-.6c-.2 0-.6.1-.9.4-.3.3-1.1 1.1-1.1 2.7s1.2 3.1 1.3 3.3c.2.2 2.3 3.5 5.6 4.9.8.3 1.4.5 1.9.7.8.2 1.5.2 2.1.1.6-.1 1.8-.7 2.1-1.5.3-.7.3-1.4.2-1.5-.1-.1-.3-.2-.6-.4Z" />
-      </svg>
-    </span>
-  );
-}
 
 function timeLabel(ts) {
   if (!ts) return '—';
@@ -596,18 +587,13 @@ const CaptainFixtureCard = React.memo(function CaptainFixtureCard({ item, teams,
               <p>Submitted<br /><strong>{timeLabel(lineupSubmission.submittedAt)}</strong></p>
               <p>WhatsApp<br /><strong>{revealed ? (lineupSubmission.whatsappShared ? `WhatsApp Shared ${timeLabel(lineupSubmission.whatsappSharedAt)}` : 'Not Shared') : 'Available after both teams lock'}</strong></p>
               {revealed && (
-                <a
-                  className="btn success whatsapp-share-action"
+                <WhatsAppShareButton
                   href={waHref}
-                  target="_blank"
-                  rel="noreferrer"
                   onClick={markWhatsappShared}
-                  aria-label={`Share ${captainTeam?.name || 'lineup'} via WhatsApp`}
-                  data-testid={`share-lineup-whatsapp-${item.id}`}
-                  title="Share via WhatsApp"
-                >
-                  <WhatsAppIcon />
-                </a>
+                  label="Share Lineups"
+                  ariaLabel={`Share ${captainTeam?.name || 'lineup'} via WhatsApp`}
+                  testId={`share-lineup-whatsapp-${item.id}`}
+                />
               )}
               <button className="btn ghost" type="button" onClick={onRefresh}>Refresh</button>
               <p className="hint">Last Updated<br />{timeLabel(lineupSubmission.lastUpdatedAt)}</p>
@@ -736,19 +722,14 @@ function CompletedMatchWhatsappShare({ item, teams, captainTeam, opponent, lineu
 
   return (
     <div style={{ marginTop: '.6rem', display: 'flex', alignItems: 'center', gap: '.5rem', flexWrap: 'wrap' }}>
-      <a
-        className="btn small success whatsapp-share-labeled"
+      <WhatsAppShareButton
         href={waHref}
-        target="_blank"
-        rel="noreferrer"
         onClick={markShared}
-        aria-label={`Share ${captainTeam?.name || 'lineup'} via WhatsApp`}
-        data-testid={`share-lineup-whatsapp-completed-${item.id}`}
-        title="Share via WhatsApp"
-        style={{ opacity: busy ? .7 : 1 }}
-      >
-        <WhatsAppIcon /> <span>Share Lineups</span>
-      </a>
+        label="Share Lineups"
+        ariaLabel={`Share ${captainTeam?.name || 'lineup'} via WhatsApp`}
+        testId={`share-lineup-whatsapp-completed-${item.id}`}
+        busy={busy}
+      />
       {lineupSubmission?.whatsappShared && <span className="hint">Shared {timeLabel(lineupSubmission.whatsappSharedAt)}</span>}
       {msg && <span className="hint" style={{ color: '#dc2626' }}>{msg}</span>}
     </div>

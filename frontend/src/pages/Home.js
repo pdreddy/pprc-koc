@@ -27,10 +27,10 @@ function calendarBadgeParts(iso) {
 function CalendarBadge({ date }) {
   const { month, day } = calendarBadgeParts(date);
   return (
-    <div className="cfc-cal-badge" aria-hidden="true">
+    <span className="cfc-cal-badge" aria-hidden="true">
       <span className="cfc-cal-month">{month}</span>
       <span className="cfc-cal-day">{day}</span>
-    </div>
+    </span>
   );
 }
 
@@ -737,7 +737,7 @@ function CompletedMatchWhatsappShare({ item, teams, captainTeam, opponent, lineu
   return (
     <div style={{ marginTop: '.6rem', display: 'flex', alignItems: 'center', gap: '.5rem', flexWrap: 'wrap' }}>
       <a
-        className="btn small success whatsapp-share-action"
+        className="btn small success whatsapp-share-labeled"
         href={waHref}
         target="_blank"
         rel="noreferrer"
@@ -747,7 +747,7 @@ function CompletedMatchWhatsappShare({ item, teams, captainTeam, opponent, lineu
         title="Share via WhatsApp"
         style={{ opacity: busy ? .7 : 1 }}
       >
-        <WhatsAppIcon /> Share Lineups
+        <WhatsAppIcon /> <span>Share Lineups</span>
       </a>
       {lineupSubmission?.whatsappShared && <span className="hint">Shared {timeLabel(lineupSubmission.whatsappSharedAt)}</span>}
       {msg && <span className="hint" style={{ color: '#dc2626' }}>{msg}</span>}

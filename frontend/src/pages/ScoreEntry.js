@@ -1,10 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { ref, update } from 'firebase/database';
+import { ref, remove, update } from 'firebase/database';
 import { db, ensureAuth, PATHS } from '../firebase';
 import { ScoreProcessingService } from '../services/ScoreProcessingService';
 import { writeAuditLog, recordLineupAudit } from '../services/AuditService';
-import { ROLES, isAdminRole } from '../utils/roles';
+import { ROLES, canDeleteMatch, isAdminRole } from '../utils/roles';
 import { useAuth } from '../contexts/AuthContext';
 import { matchName } from '../utils/nameMatch';
 import { resolveMatchTeams } from '../utils/matchTeams';
@@ -484,6 +484,13 @@ function SetRow({ idx, set, onChange, disabled, isMatchTieBreak = false, team1Ab
     setEditing(false);
     scrollToNextSet(element);
   };
+  const applyMatchTieBreakWinner = (winnerTeamNum) => {
+    setQuickWinner(winnerTeamNum);
+    const nextSet = winnerTeamNum === 1
+      ? { ...set, a: set.a || '10' }
+      : { ...set, b: set.b || '10' };
+    onChange(nextSet);
+  };
 
   if (setComplete && !editing) {
     return (
@@ -543,12 +550,10 @@ function SetRow({ idx, set, onChange, disabled, isMatchTieBreak = false, team1Ab
       >
         ⇄
       </button>
-      {!isMatchTieBreak && (
-        <div className="set-winner-picker" aria-label={`Set ${idx + 1} winner`}>
-          <button type="button" className={selectedWinner === 1 ? 'active' : ''} disabled={disabled} onClick={() => setQuickWinner(1)}>{team1Abbr}</button>
-          <button type="button" className={selectedWinner === 2 ? 'active' : ''} disabled={disabled} onClick={() => setQuickWinner(2)}>{team2Abbr}</button>
-        </div>
-      )}
+      <div className="set-winner-picker" aria-label={`${isMatchTieBreak ? 'Match tiebreak' : `Set ${idx + 1}`} winner`}>
+        <button type="button" className={selectedWinner === 1 ? 'active' : ''} disabled={disabled} onClick={() => isMatchTieBreak ? applyMatchTieBreakWinner(1) : setQuickWinner(1)}>{team1Abbr}</button>
+        <button type="button" className={selectedWinner === 2 ? 'active' : ''} disabled={disabled} onClick={() => isMatchTieBreak ? applyMatchTieBreakWinner(2) : setQuickWinner(2)}>{team2Abbr}</button>
+      </div>
       {!isMatchTieBreak && (
         <div className="fast-score-row compact" aria-label={`Set ${idx + 1} fast score entry`}>
           {[0, 1, 2, 3].map(games => (
@@ -1148,14 +1153,48 @@ function FormEntry({ teams, matches, schedule, lineupSubmissions, revealedLineup
     return false;
   }, [session, loadedLineupFixture, targetScheduleId, lineupSubmissions, schedule]);
 
-  // Find existing submitted match record for this schedule to display read-only
+  // Find existing submitted match record for this schedule to display read-only.
+  // Captains only see this once they're blocked from re-submitting; admins can see
+  // it (and reset it, see canDeleteMatch below) any time the schedule already has a result.
   const existingMatch = useMemo(() => {
     const schedId = loadedLineupFixture?.item?.id || targetScheduleId;
-    if (!schedId || !scoreBlocked) return null;
-    const mySubmission = lineupSubmissions?.[schedId]?.[session.teamId];
-    if (!mySubmission?.scoreSavedAt) return null;
+    if (!schedId) return null;
+    if (session.role === ROLES.CAPTAIN) {
+      if (!scoreBlocked) return null;
+      const mySubmission = lineupSubmissions?.[schedId]?.[session.teamId];
+      if (!mySubmission?.scoreSavedAt) return null;
+    }
     return (matches || []).find(m => m.scheduleId === schedId || m.matchScheduleId === schedId) || null;
   }, [scoreBlocked, loadedLineupFixture, targetScheduleId, lineupSubmissions, session, matches]);
+
+  const [resettingScore, setResettingScore] = useState(false);
+  const handleResetScore = async () => {
+    if (!existingMatch?.id) return;
+    if (!window.confirm(`Reset the saved score for ${existingMatch.t1Abbr || existingMatch.t1} vs ${existingMatch.t2Abbr || existingMatch.t2}? This removes the result and standings updates so it can be re-entered.`)) return;
+    const schedId = loadedLineupFixture?.item?.id || targetScheduleId;
+    try {
+      setResettingScore(true);
+      await ensureAuth();
+      await remove(ref(db, `${PATHS.matches}/${existingMatch.id}`));
+      await ScoreProcessingService.processMatchResult(null, { session, matchRecord: { ...existingMatch, id: existingMatch.id } });
+      if (schedId) {
+        const clearUpdates = {};
+        [existingMatch.t1Id, existingMatch.t2Id].filter(Boolean).forEach(teamId => {
+          clearUpdates[`${PATHS.lineupSubmissions}/${schedId}/${teamId}/scoreSavedAt`] = null;
+          clearUpdates[`${PATHS.lineupSubmissions}/${schedId}/${teamId}/convertedToScoreAt`] = null;
+          clearUpdates[`${PATHS.lineupSubmissionMeta}/${schedId}/${teamId}/scoreSavedAt`] = null;
+          clearUpdates[`${PATHS.lineupSubmissionMeta}/${schedId}/${teamId}/convertedToScoreAt`] = null;
+        });
+        await update(ref(db), clearUpdates);
+      }
+      await writeAuditLog({ actionType: 'Score Reset', session, targetType: 'match', targetId: existingMatch.id, oldValue: existingMatch });
+      setSuccess('Score reset. Re-enter and save the corrected result below.');
+    } catch (e) {
+      setError('Reset failed: ' + e.message);
+    } finally {
+      setResettingScore(false);
+    }
+  };
 
   const totals = useMemo(() => {
     let totalG1 = 0, totalG2 = 0, totalS1 = 0, totalS2 = 0, w1 = 0, w2 = 0;
@@ -1458,18 +1497,30 @@ function FormEntry({ teams, matches, schedule, lineupSubmissions, revealedLineup
               ))}
             </div>
           )}
-          <p className="hint" style={{ marginTop: '.75rem', marginBottom: 0 }}>Contact an admin if this score needs to be corrected.</p>
+          <div style={{ marginTop: '.75rem' }}>
+            <ShareResultPreview text={formatMatchShareText(existingMatch)} compact />
+          </div>
+          {canDeleteMatch(session) ? (
+            <div style={{ marginTop: '.75rem' }}>
+              <button type="button" className="btn small danger" onClick={handleResetScore} disabled={resettingScore} data-testid="reset-existing-score-btn">
+                {resettingScore ? 'Resetting…' : 'Reset score (Super Admin)'}
+              </button>
+              <p className="hint" style={{ marginTop: '.4rem', marginBottom: 0 }}>Removes this result and its standings/ratings updates so it can be re-entered below.</p>
+            </div>
+          ) : (
+            <p className="hint" style={{ marginTop: '.75rem', marginBottom: 0 }}>This score has already been submitted and can't be submitted again. Contact a Super Admin if it needs to be corrected.</p>
+          )}
         </div>
       )}
 
-      {team1 && team2 && !scoreBlocked && submittedLineupFixtures.length === 0 && (
+      {team1 && team2 && !scoreBlocked && !existingMatch && submittedLineupFixtures.length === 0 && (
         <div className="card score-lineup-loader" data-testid="form-score-lineup-pending">
-          <h2>Official lineup pending</h2>
+          <h2>Lineups Not Submitted</h2>
           <p className="hint">Score lines are loaded only after both captains submit and lock their dashboard lineups. Manual lineup selection is no longer available on Score Entry.</p>
         </div>
       )}
 
-      {team1 && team2 && !scoreBlocked && courts.map((c, idx) => {
+      {team1 && team2 && !scoreBlocked && !existingMatch && courts.map((c, idx) => {
         const status = courtCompletion(c);
         const result = computeCourt(c);
         const winnerName = result.winnerTeamNum === 1 ? team1.name : (result.winnerTeamNum === 2 ? team2.name : 'Winner pending');

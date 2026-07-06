@@ -8,10 +8,14 @@ import { isAdminRole } from '../utils/roles';
 import { matchTeamNames, matchWinnerId } from '../utils/matchTeams';
 import { approvedMatches } from '../utils/matchStatus';
 
+const PAGE_SIZE = 20;
+
 export default function History({ matches, teams, onMatchDeleted }) {
   const [openId, setOpenId] = useState(null);
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const { session } = useAuth();
   const visibleMatches = approvedMatches(matches);
+  const pagedMatches = visibleMatches.slice(0, visibleCount);
 
   const handleDelete = async (m, names) => {
     if (!window.confirm(`Delete match ${names.t1Name} vs ${names.t2Name}?`)) return;
@@ -36,7 +40,7 @@ export default function History({ matches, teams, onMatchDeleted }) {
         <div className="card center muted" data-testid="history-empty">No matches yet. Sign in as a captain to enter scores.</div>
       )}
 
-      {visibleMatches.map((m) => {
+      {pagedMatches.map((m) => {
         const names = matchTeamNames(m, teams);
         const winnerId = matchWinnerId(m, teams);
         const winnerName = winnerId === names.team1Id ? names.t1Name : (winnerId === names.team2Id ? names.t2Name : (m.win || 'Unknown'));
@@ -91,6 +95,14 @@ export default function History({ matches, teams, onMatchDeleted }) {
           </div>
         );
       })}
+
+      {visibleCount < visibleMatches.length && (
+        <div className="center" style={{ marginTop: '1rem' }}>
+          <button className="btn ghost" onClick={() => setVisibleCount(c => c + PAGE_SIZE)} data-testid="history-show-more">
+            Show more ({visibleMatches.length - visibleCount} remaining)
+          </button>
+        </div>
+      )}
     </main>
   );
 }

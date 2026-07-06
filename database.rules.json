@@ -16,6 +16,13 @@
       "schedule": { ".read": "auth != null", ".write": "auth != null" },
       "settings": { ".read": "auth != null", ".write": "auth != null" },
       "standings": { ".read": "auth != null", ".write": "auth != null" },
+      "pprcRatings": { ".read": "auth != null", ".write": "auth != null" },
+      "playerHistory": { ".read": "auth != null", ".write": "auth != null" },
+      "teamHistory": { ".read": "auth != null", ".write": "auth != null" },
+      "playerMatchups": { ".read": "auth != null", ".write": "auth != null" },
+      "teamMatchups": { ".read": "auth != null", ".write": "auth != null" },
+      "playerEligibility": { ".read": "auth != null", ".write": "auth != null" },
+      "cachedSummaries": { ".read": "auth != null", ".write": "auth != null" },
       "auditLogs": { ".read": "auth != null", ".write": "auth != null", ".indexOn": ["timestamp"] },
       "lineupSubmissionMeta": {
         ".read": "auth != null",
@@ -50,6 +57,8 @@
         ".read": "auth != null",
         ".write": "auth != null"
       }
-    }
+    },
+    "KOC2DB": { ".read": "auth != null", ".write": false },
+    "KOC2DBPONEW": { ".read": "auth != null", ".write": false }
   }
 }

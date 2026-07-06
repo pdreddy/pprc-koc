@@ -1,10 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { ref, update } from 'firebase/database';
+import { ref, remove, update } from 'firebase/database';
 import { db, ensureAuth, PATHS } from '../firebase';
 import { ScoreProcessingService } from '../services/ScoreProcessingService';
 import { writeAuditLog, recordLineupAudit } from '../services/AuditService';
-import { ROLES, isAdminRole } from '../utils/roles';
+import { ROLES, canDeleteMatch, isAdminRole } from '../utils/roles';
 import { useAuth } from '../contexts/AuthContext';
 import { matchName } from '../utils/nameMatch';
 import { resolveMatchTeams } from '../utils/matchTeams';
@@ -1153,14 +1153,48 @@ function FormEntry({ teams, matches, schedule, lineupSubmissions, revealedLineup
     return false;
   }, [session, loadedLineupFixture, targetScheduleId, lineupSubmissions, schedule]);
 
-  // Find existing submitted match record for this schedule to display read-only
+  // Find existing submitted match record for this schedule to display read-only.
+  // Captains only see this once they're blocked from re-submitting; admins can see
+  // it (and reset it, see canDeleteMatch below) any time the schedule already has a result.
   const existingMatch = useMemo(() => {
     const schedId = loadedLineupFixture?.item?.id || targetScheduleId;
-    if (!schedId || !scoreBlocked) return null;
-    const mySubmission = lineupSubmissions?.[schedId]?.[session.teamId];
-    if (!mySubmission?.scoreSavedAt) return null;
+    if (!schedId) return null;
+    if (session.role === ROLES.CAPTAIN) {
+      if (!scoreBlocked) return null;
+      const mySubmission = lineupSubmissions?.[schedId]?.[session.teamId];
+      if (!mySubmission?.scoreSavedAt) return null;
+    }
     return (matches || []).find(m => m.scheduleId === schedId || m.matchScheduleId === schedId) || null;
   }, [scoreBlocked, loadedLineupFixture, targetScheduleId, lineupSubmissions, session, matches]);
+
+  const [resettingScore, setResettingScore] = useState(false);
+  const handleResetScore = async () => {
+    if (!existingMatch?.id) return;
+    if (!window.confirm(`Reset the saved score for ${existingMatch.t1Abbr || existingMatch.t1} vs ${existingMatch.t2Abbr || existingMatch.t2}? This removes the result and standings updates so it can be re-entered.`)) return;
+    const schedId = loadedLineupFixture?.item?.id || targetScheduleId;
+    try {
+      setResettingScore(true);
+      await ensureAuth();
+      await remove(ref(db, `${PATHS.matches}/${existingMatch.id}`));
+      await ScoreProcessingService.processMatchResult(null, { session, matchRecord: { ...existingMatch, id: existingMatch.id } });
+      if (schedId) {
+        const clearUpdates = {};
+        [existingMatch.t1Id, existingMatch.t2Id].filter(Boolean).forEach(teamId => {
+          clearUpdates[`${PATHS.lineupSubmissions}/${schedId}/${teamId}/scoreSavedAt`] = null;
+          clearUpdates[`${PATHS.lineupSubmissions}/${schedId}/${teamId}/convertedToScoreAt`] = null;
+          clearUpdates[`${PATHS.lineupSubmissionMeta}/${schedId}/${teamId}/scoreSavedAt`] = null;
+          clearUpdates[`${PATHS.lineupSubmissionMeta}/${schedId}/${teamId}/convertedToScoreAt`] = null;
+        });
+        await update(ref(db), clearUpdates);
+      }
+      await writeAuditLog({ actionType: 'Score Reset', session, targetType: 'match', targetId: existingMatch.id, oldValue: existingMatch });
+      setSuccess('Score reset. Re-enter and save the corrected result below.');
+    } catch (e) {
+      setError('Reset failed: ' + e.message);
+    } finally {
+      setResettingScore(false);
+    }
+  };
 
   const totals = useMemo(() => {
     let totalG1 = 0, totalG2 = 0, totalS1 = 0, totalS2 = 0, w1 = 0, w2 = 0;
@@ -1463,7 +1497,19 @@ function FormEntry({ teams, matches, schedule, lineupSubmissions, revealedLineup
               ))}
             </div>
           )}
-          <p className="hint" style={{ marginTop: '.75rem', marginBottom: 0 }}>Contact an admin if this score needs to be corrected.</p>
+          <div style={{ marginTop: '.75rem' }}>
+            <ShareResultPreview text={formatMatchShareText(existingMatch)} compact />
+          </div>
+          {canDeleteMatch(session) ? (
+            <div style={{ marginTop: '.75rem' }}>
+              <button type="button" className="btn small danger" onClick={handleResetScore} disabled={resettingScore} data-testid="reset-existing-score-btn">
+                {resettingScore ? 'Resetting…' : 'Reset score (Super Admin)'}
+              </button>
+              <p className="hint" style={{ marginTop: '.4rem', marginBottom: 0 }}>Removes this result and its standings/ratings updates so it can be re-entered below.</p>
+            </div>
+          ) : (
+            <p className="hint" style={{ marginTop: '.75rem', marginBottom: 0 }}>Contact an admin if this score needs to be corrected.</p>
+          )}
         </div>
       )}
 

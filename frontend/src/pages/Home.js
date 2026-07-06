@@ -17,6 +17,23 @@ function formatDate(iso) {
   return new Date(y, m - 1, d).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
 }
 
+function calendarBadgeParts(iso) {
+  if (!iso) return { month: '—', day: '—' };
+  const [y, m, d] = iso.split('-').map(Number);
+  const dt = new Date(y, m - 1, d);
+  return { month: dt.toLocaleDateString(undefined, { month: 'short' }).toUpperCase(), day: String(dt.getDate()) };
+}
+
+function CalendarBadge({ date }) {
+  const { month, day } = calendarBadgeParts(date);
+  return (
+    <div className="cfc-cal-badge" aria-hidden="true">
+      <span className="cfc-cal-month">{month}</span>
+      <span className="cfc-cal-day">{day}</span>
+    </div>
+  );
+}
+
 function fixtureTeams(item, teams) {
   return { team1: teams?.[item.team1Id], team2: teams?.[item.team2Id] };
 }
@@ -317,6 +334,7 @@ const CaptainFixtureCard = React.memo(function CaptainFixtureCard({ item, teams,
   const [selectionWarning, setSelectionWarning] = useState('');
   const [showOpponentCapacity, setShowOpponentCapacity] = useState(false);
   const [editingSchedule, setEditingSchedule] = useState(false);
+  const [dateDraft, setDateDraft] = useState(item.date || '');
   const [timeDraft, setTimeDraft] = useState(item.time || '');
   const [locationDraft, setLocationDraft] = useState(item.location || '');
   const [scheduleSaving, setScheduleSaving] = useState(false);
@@ -340,10 +358,11 @@ const CaptainFixtureCard = React.memo(function CaptainFixtureCard({ item, teams,
 
   useEffect(() => {
     if (!editingSchedule) {
+      setDateDraft(item.date || '');
       setTimeDraft(item.time || '');
       setLocationDraft(item.location || '');
     }
-  }, [item.time, item.location, editingSchedule]);
+  }, [item.date, item.time, item.location, editingSchedule]);
 
   const optionErrors = useMemo(() => {
     const map = {};
@@ -461,23 +480,28 @@ const CaptainFixtureCard = React.memo(function CaptainFixtureCard({ item, teams,
   };
 
   const saveScheduleDetails = async () => {
+    const nextDate = dateDraft.trim();
     const nextTime = timeDraft.trim();
     const nextLocation = locationDraft.trim();
+    if (!nextDate) {
+      setScheduleMessage('Save failed: date is required.');
+      return;
+    }
     setScheduleSaving(true);
     setScheduleMessage('');
     try {
       await ensureAuth();
-      await update(ref(db, `${PATHS.schedule}/${item.id}`), { time: nextTime, location: nextLocation });
+      await update(ref(db, `${PATHS.schedule}/${item.id}`), { date: nextDate, time: nextTime, location: nextLocation });
       await writeAuditLog({
-        actionType: 'Fixture Time/Location Edited',
+        actionType: 'Fixture Date/Time/Location Edited',
         session,
         targetType: 'schedule',
         targetId: item.id,
-        oldValue: { time: item.time || '', location: item.location || '' },
-        newValue: { time: nextTime, location: nextLocation }
+        oldValue: { date: item.date || '', time: item.time || '', location: item.location || '' },
+        newValue: { date: nextDate, time: nextTime, location: nextLocation }
       });
       setEditingSchedule(false);
-      setScheduleMessage('✅ Time & location updated');
+      setScheduleMessage('✅ Date, time & location updated');
       onRefresh();
     } catch (e) {
       setScheduleMessage(`Save failed: ${e.message}`);
@@ -500,12 +524,16 @@ const CaptainFixtureCard = React.memo(function CaptainFixtureCard({ item, teams,
   return (
     <article className={`captain-fixture-card${completed ? ' cfc-completed' : ''}`} data-testid={`captain-fixture-${item.id}`}>
       <div className="captain-fixture-main">
-        <span className="cfc-cal-icon" aria-hidden="true">📅</span>
+        <CalendarBadge date={item.date} />
         <div className="cfc-info">
           <div className="cfc-round">Round {item.round || '—'} · {formatDate(item.date)} · {item.time || 'TBD'} · 📍 {item.location || 'Location TBD'}</div>
           {!completed && (
             editingSchedule ? (
               <div className="cfc-schedule-edit" data-testid={`edit-schedule-form-${item.id}`}>
+                <label className="field">
+                  <div className="field-label">Date</div>
+                  <input className="input" type="date" value={dateDraft} onChange={e => setDateDraft(e.target.value)} disabled={scheduleSaving} data-testid={`edit-schedule-date-${item.id}`} />
+                </label>
                 <label className="field">
                   <div className="field-label">Time</div>
                   <input className="input" value={timeDraft} onChange={e => setTimeDraft(e.target.value)} placeholder="e.g. 7:15 PM" disabled={scheduleSaving} data-testid={`edit-schedule-time-${item.id}`} />
@@ -516,12 +544,12 @@ const CaptainFixtureCard = React.memo(function CaptainFixtureCard({ item, teams,
                 </label>
                 <div style={{ display: 'flex', gap: '.4rem', marginTop: '.35rem' }}>
                   <button type="button" className="btn small success" onClick={saveScheduleDetails} disabled={scheduleSaving} data-testid={`save-schedule-${item.id}`}>{scheduleSaving ? 'Saving...' : 'Save'}</button>
-                  <button type="button" className="btn small ghost" onClick={() => { setEditingSchedule(false); setTimeDraft(item.time || ''); setLocationDraft(item.location || ''); }} disabled={scheduleSaving}>Cancel</button>
+                  <button type="button" className="btn small ghost" onClick={() => { setEditingSchedule(false); setDateDraft(item.date || ''); setTimeDraft(item.time || ''); setLocationDraft(item.location || ''); }} disabled={scheduleSaving}>Cancel</button>
                 </div>
                 {scheduleMessage && <div className={scheduleMessage.startsWith('✅') ? 'success-box' : 'error-box'} style={{ marginTop: '.35rem' }}>{scheduleMessage}</div>}
               </div>
             ) : (
-              <button type="button" className="btn small ghost cfc-btn-edit-schedule" onClick={() => setEditingSchedule(true)} data-testid={`edit-schedule-${item.id}`}>✏️ Edit time/location</button>
+              <button type="button" className="btn small ghost cfc-btn-edit-schedule" onClick={() => setEditingSchedule(true)} data-testid={`edit-schedule-${item.id}`}>✏️ Edit date/time/location</button>
             )
           )}
           {scheduleMessage && !editingSchedule && <div className={scheduleMessage.startsWith('✅') ? 'success-box' : 'error-box'} style={{ marginTop: '.35rem' }}>{scheduleMessage}</div>}

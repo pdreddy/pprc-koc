@@ -706,7 +706,56 @@ function CompletedMatchDetails({ match, captainTeamId, teams }) {
   );
 }
 
-function CompletedMatchList({ title, description, fixtures, teams, matches, captainTeamId, emptyText, testid }) {
+function CompletedMatchWhatsappShare({ item, teams, captainTeam, opponent, lineupSubmission, opponentSubmission, revealedLineup, session }) {
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState('');
+  const captainName = captainTeam?.players?.find(p => p.isCaptain)?.name || captainTeam?.players?.[0]?.name || session?.teamName;
+  const waText = whatsappMessage(item, captainTeam, opponent, captainName, lineupSubmission, opponentSubmission, revealedLineup);
+  const waHref = `https://wa.me/?text=${encodeURIComponent(waText)}`;
+
+  const markShared = async () => {
+    const now = Date.now();
+    try {
+      setBusy(true);
+      await ensureAuth();
+      await update(ref(db), {
+        [`${PATHS.lineupSubmissions}/${item.id}/${captainTeam.id}/whatsappShared`]: true,
+        [`${PATHS.lineupSubmissions}/${item.id}/${captainTeam.id}/whatsappSharedAt`]: now,
+        [`${PATHS.lineupSubmissions}/${item.id}/${captainTeam.id}/lastUpdatedAt`]: now,
+        [`${PATHS.lineupSubmissionMeta}/${item.id}/${captainTeam.id}/whatsappShared`]: true,
+        [`${PATHS.lineupSubmissionMeta}/${item.id}/${captainTeam.id}/whatsappSharedAt`]: now,
+        [`${PATHS.lineupSubmissionMeta}/${item.id}/${captainTeam.id}/lastUpdatedAt`]: now
+      });
+      await recordLineupAudit({ actionType: 'Lineup WhatsApp Shared', session, scheduleId: item.id, teamId: captainTeam.id, metadata: { whatsappSharedAt: now, lastUpdatedAt: now } });
+    } catch (e) {
+      setMsg(`WhatsApp status failed: ${e.message}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div style={{ marginTop: '.6rem', display: 'flex', alignItems: 'center', gap: '.5rem', flexWrap: 'wrap' }}>
+      <a
+        className="btn small success whatsapp-share-action"
+        href={waHref}
+        target="_blank"
+        rel="noreferrer"
+        onClick={markShared}
+        aria-label={`Share ${captainTeam?.name || 'lineup'} via WhatsApp`}
+        data-testid={`share-lineup-whatsapp-completed-${item.id}`}
+        title="Share via WhatsApp"
+        style={{ opacity: busy ? .7 : 1 }}
+      >
+        <WhatsAppIcon /> Share Lineups
+      </a>
+      {lineupSubmission?.whatsappShared && <span className="hint">Shared {timeLabel(lineupSubmission.whatsappSharedAt)}</span>}
+      {msg && <span className="hint" style={{ color: '#dc2626' }}>{msg}</span>}
+    </div>
+  );
+}
+
+function CompletedMatchList({ title, description, fixtures, teams, matches, captainTeam, lineupSubmissions, revealedLineups, session, emptyText, testid }) {
   const [expanded, setExpanded] = useState({});
   const toggle = id => setExpanded(prev => ({ ...prev, [id]: !prev[id] }));
 
@@ -734,6 +783,11 @@ function CompletedMatchList({ title, description, fixtures, teams, matches, capt
             const { team1, team2 } = fixtureTeams(item, teams);
             const isOpen = !!expanded[item.id];
             const match = findMatch(item);
+            const opponentId = item.team1Id === captainTeam?.id ? item.team2Id : item.team1Id;
+            const opponent = teams?.[opponentId];
+            const lineupSubmission = lineupSubmissions?.[item.id]?.[captainTeam?.id];
+            const opponentSubmission = lineupSubmissions?.[item.id]?.[opponentId];
+            const revealedLineup = Object.values(revealedLineups || {}).find(row => row.scheduleId === item.id);
             return (
               <div key={item.id} data-testid={`home-completed-${item.id}`} style={{ border: '1.5px solid #d1fae5', borderRadius: 10, background: '#f0fdf4', overflow: 'hidden' }}>
                 <button
@@ -744,14 +798,15 @@ function CompletedMatchList({ title, description, fixtures, teams, matches, capt
                   <span style={{ fontSize: '.85rem', color: '#6b7280', flexShrink: 0 }}>{isOpen ? '▼' : '▶'}</span>
                   <span style={{ fontSize: '.75rem', flexShrink: 0 }}>✅</span>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: '.8rem', color: '#6b7280', fontWeight: 600 }}>Round {item.round || '—'} · {formatDate(item.date)}</div>
+                    <div style={{ fontSize: '.8rem', color: '#6b7280', fontWeight: 600 }}>Round {item.round || '—'} · {formatDate(item.date)} · {item.time || 'TBD'} · 📍 {item.location || 'Location TBD'}</div>
                     <div style={{ fontSize: '.88rem', fontWeight: 700, color: '#1e293b' }}>{team1?.name || 'TBD'} <span style={{ fontWeight: 400, color: '#6b7280' }}>vs</span> {team2?.name || 'TBD'}</div>
                   </div>
                   <span className="tag win" style={{ fontSize: '.7rem', flexShrink: 0 }}>Completed</span>
                 </button>
                 {isOpen && (
                   <div style={{ padding: '0 .75rem .75rem' }}>
-                    <CompletedMatchDetails match={match} captainTeamId={captainTeamId} teams={teams} />
+                    <CompletedMatchDetails match={match} captainTeamId={captainTeam?.id} teams={teams} />
+                    {captainTeam && <CompletedMatchWhatsappShare item={item} teams={teams} captainTeam={captainTeam} opponent={opponent} lineupSubmission={lineupSubmission} opponentSubmission={opponentSubmission} revealedLineup={revealedLineup} session={session} />}
                   </div>
                 )}
               </div>
@@ -814,7 +869,7 @@ function CaptainScheduleList({ fixtures, completedFixtures, teams, captainTeam, 
           })}
         </div>
       )}
-      <CompletedMatchList title="Completed Matches" description="Tap a match to see line-by-line results." fixtures={completedFixtures} teams={teams} matches={matches} captainTeamId={captainTeam?.id} emptyText="No completed fixtures yet." testid="captain-completed-schedule-card" />
+      <CompletedMatchList title="Completed Matches" description="Tap a match to see line-by-line results." fixtures={completedFixtures} teams={teams} matches={matches} captainTeam={captainTeam} lineupSubmissions={lineupSubmissions} revealedLineups={revealedLineups} session={session} emptyText="No completed fixtures yet." testid="captain-completed-schedule-card" />
     </section>
   );
 }

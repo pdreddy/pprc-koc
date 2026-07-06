@@ -484,6 +484,13 @@ function SetRow({ idx, set, onChange, disabled, isMatchTieBreak = false, team1Ab
     setEditing(false);
     scrollToNextSet(element);
   };
+  const applyMatchTieBreakWinner = (winnerTeamNum) => {
+    setQuickWinner(winnerTeamNum);
+    const nextSet = winnerTeamNum === 1
+      ? { ...set, a: set.a || '10' }
+      : { ...set, b: set.b || '10' };
+    onChange(nextSet);
+  };
 
   if (setComplete && !editing) {
     return (
@@ -543,12 +550,10 @@ function SetRow({ idx, set, onChange, disabled, isMatchTieBreak = false, team1Ab
       >
         ⇄
       </button>
-      {!isMatchTieBreak && (
-        <div className="set-winner-picker" aria-label={`Set ${idx + 1} winner`}>
-          <button type="button" className={selectedWinner === 1 ? 'active' : ''} disabled={disabled} onClick={() => setQuickWinner(1)}>{team1Abbr}</button>
-          <button type="button" className={selectedWinner === 2 ? 'active' : ''} disabled={disabled} onClick={() => setQuickWinner(2)}>{team2Abbr}</button>
-        </div>
-      )}
+      <div className="set-winner-picker" aria-label={`${isMatchTieBreak ? 'Match tiebreak' : `Set ${idx + 1}`} winner`}>
+        <button type="button" className={selectedWinner === 1 ? 'active' : ''} disabled={disabled} onClick={() => isMatchTieBreak ? applyMatchTieBreakWinner(1) : setQuickWinner(1)}>{team1Abbr}</button>
+        <button type="button" className={selectedWinner === 2 ? 'active' : ''} disabled={disabled} onClick={() => isMatchTieBreak ? applyMatchTieBreakWinner(2) : setQuickWinner(2)}>{team2Abbr}</button>
+      </div>
       {!isMatchTieBreak && (
         <div className="fast-score-row compact" aria-label={`Set ${idx + 1} fast score entry`}>
           {[0, 1, 2, 3].map(games => (

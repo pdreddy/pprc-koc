@@ -1,4 +1,13 @@
-import { buildLineupCourts, scoreLineupFixtures } from './ScoreEntry';
+jest.mock('../firebase', () => ({
+  db: {},
+  ensureAuth: jest.fn(),
+  PATHS: {
+    lineupSubmissions: 'koc_s3/lineupSubmissions',
+    lineupSubmissionMeta: 'koc_s3/lineupSubmissionMeta'
+  }
+}));
+
+import { buildLineupCourts, scoreLineupFixtures, buildLineupScoreClearUpdates } from './ScoreEntry';
 
 const teams = {
   rr: {
@@ -142,5 +151,25 @@ test('scoreLineupFixtures keeps locked submission fallback distinct from canonic
     source: 'lockedSubmissions',
     ready: true,
     revealed: false
+  });
+});
+
+test('buildLineupScoreClearUpdates clears saved score markers for both teams', () => {
+  const updates = buildLineupScoreClearUpdates({
+    scheduleId: 'A-r1-m1',
+    t1Id: 'rr',
+    t2Id: 'bb'
+  }, 12345);
+
+  expect(updates).toMatchObject({
+    'koc_s3/lineupSubmissions/A-r1-m1/rr/scoreSavedAt': null,
+    'koc_s3/lineupSubmissions/A-r1-m1/rr/scoreSavedBy': null,
+    'koc_s3/lineupSubmissions/A-r1-m1/rr/convertedToScoreAt': null,
+    'koc_s3/lineupSubmissions/A-r1-m1/rr/lastUpdatedAt': 12345,
+    'koc_s3/lineupSubmissions/A-r1-m1/bb/scoreSavedAt': null,
+    'koc_s3/lineupSubmissionMeta/A-r1-m1/bb/scoreSavedAt': null,
+    'koc_s3/lineupSubmissionMeta/A-r1-m1/bb/scoreSavedBy': null,
+    'koc_s3/lineupSubmissionMeta/A-r1-m1/bb/convertedToScoreAt': null,
+    'koc_s3/lineupSubmissionMeta/A-r1-m1/bb/lastUpdatedAt': 12345
   });
 });

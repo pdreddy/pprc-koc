@@ -600,6 +600,33 @@ function SetRow({ idx, set, onChange, disabled, isMatchTieBreak = false, team1Ab
   );
 }
 
+function courtFromMatchLine(line) {
+  const template = COURT_TEMPLATES.find(t => t.label === line?.label) || { label: line?.label || 'Court', type: line?.type === 'singles' ? 'singles' : 'doubles', setCount: line?.type === 'singles' ? 5 : 3 };
+  const sets = newCourt(template.label, template.type, template.setCount).sets.map((set, idx) => {
+    const saved = line?.sets?.[idx];
+    if (!saved) return set;
+    const isMatchTieBreak = typeof saved.matchTieBreak === 'object';
+    return {
+      a: String(isMatchTieBreak ? saved.matchTieBreak.team1 : saved.team1 ?? ''),
+      b: String(isMatchTieBreak ? saved.matchTieBreak.team2 : saved.team2 ?? ''),
+      tieA: saved.tieBreak ? String(saved.tieBreak.team1 ?? '') : '',
+      tieB: saved.tieBreak ? String(saved.tieBreak.team2 ?? '') : ''
+    };
+  });
+  return {
+    label: template.label,
+    type: template.type,
+    p1: [...(line?.players?.team1 || [])],
+    p2: [...(line?.players?.team2 || [])],
+    sets
+  };
+}
+
+function courtsFromMatch(match) {
+  const linesByLabel = new Map((match?.lines || []).map(line => [line.label, line]));
+  return COURT_TEMPLATES.map(template => courtFromMatchLine(linesByLabel.get(template.label) || { label: template.label, type: template.type }));
+}
+
 function computeCourt(c) {
   let g1 = 0, g2 = 0, s1 = 0, s2 = 0;
   const sets = [];
@@ -986,6 +1013,27 @@ export function scoreLineupFixtures(schedule, revealedLineups, lineupSubmissions
   return Array.from(rows.values());
 }
 
+export function buildLineupScoreClearUpdates(record, now = Date.now()) {
+  if (!record?.scheduleId) return {};
+  const updates = {};
+  [record.t1Id, record.t2Id].filter(Boolean).forEach(teamId => {
+    updates[`${PATHS.lineupSubmissions}/${record.scheduleId}/${teamId}/scoreSavedAt`] = null;
+    updates[`${PATHS.lineupSubmissions}/${record.scheduleId}/${teamId}/scoreSavedBy`] = null;
+    updates[`${PATHS.lineupSubmissions}/${record.scheduleId}/${teamId}/convertedToScoreAt`] = null;
+    updates[`${PATHS.lineupSubmissions}/${record.scheduleId}/${teamId}/lastUpdatedAt`] = now;
+    updates[`${PATHS.lineupSubmissionMeta}/${record.scheduleId}/${teamId}/scoreSavedAt`] = null;
+    updates[`${PATHS.lineupSubmissionMeta}/${record.scheduleId}/${teamId}/scoreSavedBy`] = null;
+    updates[`${PATHS.lineupSubmissionMeta}/${record.scheduleId}/${teamId}/convertedToScoreAt`] = null;
+    updates[`${PATHS.lineupSubmissionMeta}/${record.scheduleId}/${teamId}/lastUpdatedAt`] = now;
+  });
+  return updates;
+}
+
+export async function clearLineupScoreMarkers(record) {
+  const updates = buildLineupScoreClearUpdates(record);
+  if (Object.keys(updates).length) await update(ref(db), updates);
+}
+
 
 async function markLineupConvertedToScore(record, session) {
   if (!record?.scheduleId) return;
@@ -1052,6 +1100,7 @@ function FormEntry({ teams, matches, schedule, lineupSubmissions, revealedLineup
   const [visibleSetCounts, setVisibleSetCounts] = useState({});
   const [collapsedCourts, setCollapsedCourts] = useState({});
   const [editingCollapsedCourts, setEditingCollapsedCourts] = useState({});
+  const [editingMatchId, setEditingMatchId] = useState('');
 
   useEffect(() => {
     if (myTeam?.id && !team1Id) setTeam1Id(myTeam.id);
@@ -1166,6 +1215,21 @@ function FormEntry({ teams, matches, schedule, lineupSubmissions, revealedLineup
     return (matches || []).find(m => m.scheduleId === schedId || m.matchScheduleId === schedId) || null;
   }, [scoreBlocked, loadedLineupFixture, targetScheduleId, lineupSubmissions, session, matches]);
 
+  const displayExistingMatch = existingMatch && editingMatchId !== existingMatch.id;
+
+  const startEditExistingScore = () => {
+    if (!existingMatch) return;
+    setCourts(courtsFromMatch(existingMatch));
+    setLoadedLineupFixture(previous => previous || (existingMatch.scheduleId ? { item: schedule?.[existingMatch.scheduleId] || { id: existingMatch.scheduleId, team1Id: existingMatch.t1Id, team2Id: existingMatch.t2Id }, revealId: existingMatch.revealId, revealCode: existingMatch.revealCode, source: existingMatch.lineupSource || 'existingMatch', ready: true } : null));
+    setEditingMatchId(existingMatch.id);
+    setError('');
+    setSuccess('Editing saved score. Review/correct the courts below, then preview and save.');
+    setShareText('');
+    setPendingRecord(null);
+    setCollapsedCourts({});
+    setEditingCollapsedCourts({});
+  };
+
   const [resettingScore, setResettingScore] = useState(false);
   const handleResetScore = async () => {
     if (!existingMatch?.id) return;
@@ -1176,16 +1240,7 @@ function FormEntry({ teams, matches, schedule, lineupSubmissions, revealedLineup
       await ensureAuth();
       await remove(ref(db, `${PATHS.matches}/${existingMatch.id}`));
       await ScoreProcessingService.processMatchResult(null, { session, matchRecord: { ...existingMatch, id: existingMatch.id } });
-      if (schedId) {
-        const clearUpdates = {};
-        [existingMatch.t1Id, existingMatch.t2Id].filter(Boolean).forEach(teamId => {
-          clearUpdates[`${PATHS.lineupSubmissions}/${schedId}/${teamId}/scoreSavedAt`] = null;
-          clearUpdates[`${PATHS.lineupSubmissions}/${schedId}/${teamId}/convertedToScoreAt`] = null;
-          clearUpdates[`${PATHS.lineupSubmissionMeta}/${schedId}/${teamId}/scoreSavedAt`] = null;
-          clearUpdates[`${PATHS.lineupSubmissionMeta}/${schedId}/${teamId}/convertedToScoreAt`] = null;
-        });
-        await update(ref(db), clearUpdates);
-      }
+      await clearLineupScoreMarkers({ ...existingMatch, scheduleId: schedId || existingMatch.scheduleId });
       await writeAuditLog({ actionType: 'Score Reset', session, targetType: 'match', targetId: existingMatch.id, oldValue: existingMatch });
       setSuccess('Score reset. Re-enter and save the corrected result below.');
     } catch (e) {
@@ -1376,14 +1431,18 @@ function FormEntry({ teams, matches, schedule, lineupSubmissions, revealedLineup
     try {
       setSaving(true);
       await ensureAuth();
-      const saved = await ScoreProcessingService.updateAfterScoreEntry(pendingRecord, { session });
+      const saved = editingMatchId
+        ? { key: editingMatchId, matchRecord: { ...pendingRecord, id: editingMatchId } }
+        : await ScoreProcessingService.updateAfterScoreEntry(pendingRecord, { session });
+      if (editingMatchId) await ScoreProcessingService.processMatchResult(editingMatchId, { session, matchRecord: saved.matchRecord, writeMatchRecord: true });
       await markLineupConvertedToScore(pendingRecord, session);
       const savedRecord = { ...saved.matchRecord, scheduleId: pendingRecord.scheduleId, matchScheduleId: pendingRecord.matchScheduleId, revealId: pendingRecord.revealId, revealCode: pendingRecord.revealCode, lineupSource: pendingRecord.lineupSource };
       onScoreSaved?.(savedRecord);
-      await writeAuditLog({ actionType: 'Score Entry', session, targetType: 'match', targetId: saved.key, newValue: savedRecord });
+      await writeAuditLog({ actionType: editingMatchId ? 'Score Edit' : 'Score Entry', session, targetType: 'match', targetId: saved.key, newValue: savedRecord, oldValue: editingMatchId ? existingMatch : undefined });
       setSuccess(`✅ Saved and synchronized ratings, standings, histories, and dashboard:  ${pendingRecord.t1} vs ${pendingRecord.t2} — Winner: ${pendingRecord.win}`);
       setShareText(formatMatchShareText(savedRecord));
       setPendingRecord(null);
+      setEditingMatchId('');
       setVisibleSetCounts({});
       setCollapsedCourts({});
       setEditingCollapsedCourts({});
@@ -1474,7 +1533,7 @@ function FormEntry({ teams, matches, schedule, lineupSubmissions, revealedLineup
         </div>
       )}
 
-      {existingMatch && (
+      {displayExistingMatch && (
         <div className="card" style={{ border: '1.5px solid #10b981', background: '#f0fdf4' }} data-testid="score-already-submitted-summary">
           <h2 style={{ marginTop: 0, color: '#065f46' }}>✅ Score Already Submitted</h2>
           <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap', marginBottom: '.75rem' }}>
@@ -1500,7 +1559,10 @@ function FormEntry({ teams, matches, schedule, lineupSubmissions, revealedLineup
             <ShareResultPreview text={formatMatchShareText(existingMatch)} compact />
           </div>
           {canDeleteMatch(session) ? (
-            <div style={{ marginTop: '.75rem' }}>
+            <div style={{ marginTop: '.75rem', display: 'flex', gap: '.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+              <button type="button" className="btn small success" onClick={startEditExistingScore} data-testid="edit-existing-score-btn">
+                Edit score (Super Admin)
+              </button>
               <button type="button" className="btn small danger" onClick={handleResetScore} disabled={resettingScore} data-testid="reset-existing-score-btn">
                 {resettingScore ? 'Resetting…' : 'Reset score (Super Admin)'}
               </button>
@@ -1512,14 +1574,14 @@ function FormEntry({ teams, matches, schedule, lineupSubmissions, revealedLineup
         </div>
       )}
 
-      {team1 && team2 && !scoreBlocked && !existingMatch && submittedLineupFixtures.length === 0 && (
+      {team1 && team2 && !scoreBlocked && !displayExistingMatch && submittedLineupFixtures.length === 0 && (
         <div className="card score-lineup-loader" data-testid="form-score-lineup-pending">
           <h2>Lineups Not Submitted</h2>
           <p className="hint">Score lines are loaded only after both captains submit and lock their dashboard lineups. Manual lineup selection is no longer available on Score Entry.</p>
         </div>
       )}
 
-      {team1 && team2 && !scoreBlocked && !existingMatch && courts.map((c, idx) => {
+      {team1 && team2 && !scoreBlocked && !displayExistingMatch && courts.map((c, idx) => {
         const status = courtCompletion(c);
         const result = computeCourt(c);
         const winnerName = result.winnerTeamNum === 1 ? team1.name : (result.winnerTeamNum === 2 ? team2.name : 'Winner pending');

@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { ref, remove } from 'firebase/database';
 import { db, PATHS } from '../firebase';
 import { ScoreProcessingService } from '../services/ScoreProcessingService';
+import { clearLineupScoreMarkers } from './ScoreEntry';
 import { writeAuditLog } from '../services/AuditService';
 import { isAdminRole } from '../utils/roles';
 import { matchTeamNames, matchWinnerId } from '../utils/matchTeams';
@@ -21,6 +22,7 @@ export default function History({ matches, teams, onMatchDeleted }) {
     if (!window.confirm(`Delete match ${names.t1Name} vs ${names.t2Name}?`)) return;
     try {
       await remove(ref(db, `${PATHS.matches}/${m.id}`));
+      await clearLineupScoreMarkers({ ...m, id: m.id });
       onMatchDeleted?.(m.id);
       await ScoreProcessingService.processMatchResult(null, { session, matchRecord: { ...m, id: m.id } });
       await writeAuditLog({ actionType: 'Score Delete', session, targetType: 'match', targetId: m.id, oldValue: m });

@@ -708,10 +708,12 @@ function incrementPlayerDay(days, teamId, playerName, type) {
   days.set(key, row);
 }
 
-function buildExistingEligibility(matches, teams) {
+function buildExistingEligibility(matches, teams, exclude = {}) {
   const playerDays = new Map();
   const partnerDays = new Map();
   (matches || []).forEach((match) => {
+    if (exclude.matchId && match.id === exclude.matchId) return;
+    if (exclude.scheduleId && (match.scheduleId === exclude.scheduleId || match.matchScheduleId === exclude.scheduleId)) return;
     if (match.status && match.status !== 'APPROVED' && match.status !== 'approved') return;
     const { team1, team2 } = resolveMatchTeams(match, teams);
     if (!team1 || !team2) return;
@@ -739,10 +741,10 @@ function buildExistingEligibility(matches, teams) {
   return { playerDays, partnerDays };
 }
 
-function validateEligibilityForLines(lines, team1, team2, matches, teams, eligibilityRules = DEFAULT_ELIGIBILITY_RULES) {
+export function validateEligibilityForLines(lines, team1, team2, matches, teams, eligibilityRules = DEFAULT_ELIGIBILITY_RULES, exclude = {}) {
   const rules = normalizeEligibilityRules(eligibilityRules);
   const errors = [];
-  const existing = buildExistingEligibility(matches, teams);
+  const existing = buildExistingEligibility(matches, teams, exclude);
   const currentPlayers = new Map();
   const currentPairs = new Map();
   (lines || []).forEach((line) => {
@@ -975,13 +977,13 @@ function lineupFixtureMatchesTarget(row, targetScheduleId = '', targetRevealId =
     || (!!targetRevealId && [row.revealId, row.revealCode].filter(Boolean).map(String).includes(String(targetRevealId)));
 }
 
-export function scoreLineupFixtures(schedule, revealedLineups, lineupSubmissions, team1Id, team2Id, teams, matches, eligibilityRules) {
+export function scoreLineupFixtures(schedule, revealedLineups, lineupSubmissions, team1Id, team2Id, teams, matches, eligibilityRules, exclude = {}) {
   if (!team1Id || !team2Id) return [];
   const rows = new Map();
   const buildRow = (item, revealId, revealCode, team1Names, team2Names, revealed = true, source = 'revealedLineups') => {
     const lineupLines = buildLineupValidationLines(team1Names, team2Names);
     const eligibilityErrors = team1Names.length === 5 && team2Names.length === 5
-      ? validateEligibilityForLines(lineupLines, teams[team1Id], teams[team2Id], matches, teams, eligibilityRules)
+      ? validateEligibilityForLines(lineupLines, teams[team1Id], teams[team2Id], matches, teams, eligibilityRules, { ...exclude, scheduleId: exclude.scheduleId || item?.id })
       : [];
     return { item, revealId, revealCode, revealed, source, team1Names, team2Names, eligibilityErrors, ready: team1Names.length === 5 && team2Names.length === 5 };
   };
@@ -1116,7 +1118,7 @@ function FormEntry({ teams, matches, schedule, lineupSubmissions, revealedLineup
   const team2 = teams[team2Id];
   const opponentList = groupFilteredOpponents(teamList, team1);
   const targetFixture = targetScheduleId ? schedule?.[targetScheduleId] : null;
-  const submittedLineupFixtures = useMemo(() => scoreLineupFixtures(schedule, revealedLineups, lineupSubmissions, team1Id, team2Id, teams, matches, eligibilityRules), [schedule, revealedLineups, lineupSubmissions, team1Id, team2Id, teams, matches, eligibilityRules]);
+  const submittedLineupFixtures = useMemo(() => scoreLineupFixtures(schedule, revealedLineups, lineupSubmissions, team1Id, team2Id, teams, matches, eligibilityRules, { matchId: targetMatchId, scheduleId: targetScheduleId }), [schedule, revealedLineups, lineupSubmissions, team1Id, team2Id, teams, matches, eligibilityRules, targetMatchId, targetScheduleId]);
 
   const scheduleMatchId = loadedLineupFixture?.item?.id || targetScheduleId;
   const existingMatch = useMemo(() => {
@@ -1373,7 +1375,7 @@ function FormEntry({ teams, matches, schedule, lineupSubmissions, revealedLineup
       setError('Please enter at least one court with scores.');
       return;
     }
-    validateEligibilityForLines(lines, team1, team2, matches, teams, eligibilityRules).forEach(message => addValidationError(message));
+    validateEligibilityForLines(lines, team1, team2, matches, teams, eligibilityRules, { matchId: editingMatchId || targetMatchId, scheduleId: loadedLineupFixture?.item?.id || targetScheduleId || existingMatch?.scheduleId || existingMatch?.matchScheduleId }).forEach(message => addValidationError(message));
     if (validationErrors.length > 0) {
       setFieldErrors(nextFieldErrors);
       setError(validationErrors.join('\n'));
@@ -1815,7 +1817,7 @@ function QuickEntry({ teams, matches, schedule, lineupSubmissions, revealedLineu
     const scoreErrors = lines.flatMap(line => validateLineScore(line));
     if (scoreErrors.length > 0) { setError(scoreErrors.join('\n')); return; }
 
-    const eligibilityErrors = validateEligibilityForLines(lines, team1, team2, matches, teams, eligibilityRules);
+    const eligibilityErrors = validateEligibilityForLines(lines, team1, team2, matches, teams, eligibilityRules, { scheduleId: loadedLineupFixture?.item?.id });
     if (eligibilityErrors.length > 0) { setError(eligibilityErrors.join('\n')); return; }
 
     const winner = w1 > w2 ? team1.name : (w2 > w1 ? team2.name : null);

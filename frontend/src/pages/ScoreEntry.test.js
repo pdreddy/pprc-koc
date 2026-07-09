@@ -7,7 +7,7 @@ jest.mock('../firebase', () => ({
   }
 }));
 
-import { buildLineupCourts, scoreLineupFixtures } from './ScoreEntry';
+import { buildLineupCourts, scoreLineupFixtures, validateEligibilityForLines } from './ScoreEntry';
 import { buildLineupScoreClearUpdates } from '../utils/lineupScoreMarkers';
 
 const teams = {
@@ -173,4 +173,41 @@ test('buildLineupScoreClearUpdates clears saved score markers for both teams', (
     'koc_s3/lineupSubmissionMeta/A-r1-m1/bb/convertedToScoreAt': null,
     'koc_s3/lineupSubmissionMeta/A-r1-m1/bb/lastUpdatedAt': 12345
   });
+});
+
+
+test('validateEligibilityForLines excludes the current schedule when rechecking a saved score', () => {
+  const lines = [
+    { type: 'singles', players: { team1: ['RR Singles'], team2: ['Prashanth Jayantha Kumar'] } }
+  ];
+  const existingMatches = [
+    {
+      id: 'old-match',
+      scheduleId: 'A-r0-m1',
+      status: 'APPROVED',
+      t1Id: 'rr',
+      t2Id: 'bb',
+      lines
+    },
+    {
+      id: 'current-match',
+      scheduleId: 'A-r1-m1',
+      status: 'APPROVED',
+      t1Id: 'rr',
+      t2Id: 'bb',
+      lines
+    }
+  ];
+  const localTeams = {
+    ...teams,
+    bb: {
+      ...teams.bb,
+      players: [{ name: 'Prashanth Jayantha Kumar' }]
+    }
+  };
+
+  expect(validateEligibilityForLines(lines, localTeams.rr, localTeams.bb, existingMatches, localTeams, { maxSinglesDays: 2, maxTotalMatchDays: 10, maxPartnerDays: 10 }))
+    .toContain('Prashanth Jayantha Kumar: singles limit exceeded (3/2 Singles Days)');
+  expect(validateEligibilityForLines(lines, localTeams.rr, localTeams.bb, existingMatches, localTeams, { maxSinglesDays: 2, maxTotalMatchDays: 10, maxPartnerDays: 10 }, { scheduleId: 'A-r1-m1' }))
+    .not.toContain('Prashanth Jayantha Kumar: singles limit exceeded (3/2 Singles Days)');
 });

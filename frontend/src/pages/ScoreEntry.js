@@ -1108,6 +1108,12 @@ function FormEntry({ teams, matches, schedule, lineupSubmissions, revealedLineup
   const targetFixture = targetScheduleId ? schedule?.[targetScheduleId] : null;
   const submittedLineupFixtures = useMemo(() => scoreLineupFixtures(schedule, revealedLineups, lineupSubmissions, team1Id, team2Id, teams, matches, eligibilityRules), [schedule, revealedLineups, lineupSubmissions, team1Id, team2Id, teams, matches, eligibilityRules]);
 
+  const scheduleMatchId = loadedLineupFixture?.item?.id || targetScheduleId;
+  const existingMatch = useMemo(() => {
+    if (!scheduleMatchId) return null;
+    return (matches || []).find(m => m.scheduleId === scheduleMatchId || m.matchScheduleId === scheduleMatchId) || null;
+  }, [scheduleMatchId, matches]);
+
   // Clear form state when teams change (user explicitly picks different teams)
   const prevTeamPairRef = useRef('');
   useEffect(() => {
@@ -1142,7 +1148,7 @@ function FormEntry({ teams, matches, schedule, lineupSubmissions, revealedLineup
       const mySubmission = schedId ? lineupSubmissions?.[schedId]?.[session.teamId] : null;
       const fixture = schedId ? schedule?.[schedId] : null;
       const isPlayoff = fixture?.matchType === 'playoff' || !fixture?.group;
-      if (!isPlayoff && mySubmission?.scoreSavedAt) {
+      if (!isPlayoff && mySubmission?.scoreSavedAt && existingMatch) {
         setError('⚠️ You have already submitted a score for this match. Only one score submission is allowed per team per round-robin match.');
         setSuccess('');
       } else {
@@ -1153,7 +1159,7 @@ function FormEntry({ teams, matches, schedule, lineupSubmissions, revealedLineup
       setSuccess(`Loaded submitted dashboard lineup for schedule code ${target.revealCode || fixtureCode(target.item)}.`);
       setError('');
     }
-  }, [submittedLineupFixtures, autoLoadedRevealId, session, team1Id, targetScheduleId, targetRevealId, lineupSubmissions, schedule]);
+  }, [submittedLineupFixtures, autoLoadedRevealId, session, team1Id, targetScheduleId, targetRevealId, lineupSubmissions, schedule, existingMatch]);
 
   const updateCourt = (idx, patch) => {
     setPendingRecord(null);
@@ -1168,32 +1174,19 @@ function FormEntry({ teams, matches, schedule, lineupSubmissions, revealedLineup
     setCourts(cs => cs.map((c, i) => i === idx ? { ...c, ...patch } : c));
   };
 
-  // Determine if save should be blocked for captain (lines not submitted, or score already saved for RR match)
+  // Determine if save should be blocked for captain (lines not submitted, or an actual score record already exists).
+  // Stale scoreSavedAt markers can remain after manual deletes; those markers should not block re-entry when no match exists.
   const scoreBlocked = useMemo(() => {
     if (session.role !== ROLES.CAPTAIN) return false;
-    const schedId = loadedLineupFixture?.item?.id || targetScheduleId;
+    const schedId = scheduleMatchId;
     if (!schedId) return false;
     const mySubmission = lineupSubmissions?.[schedId]?.[session.teamId];
     if (!mySubmission?.lockedAt) return true;
     const fixture = schedule?.[schedId];
     const isPlayoff = fixture?.matchType === 'playoff' || !fixture?.group;
-    if (!isPlayoff && mySubmission?.scoreSavedAt) return true;
+    if (!isPlayoff && mySubmission?.scoreSavedAt && existingMatch) return true;
     return false;
-  }, [session, loadedLineupFixture, targetScheduleId, lineupSubmissions, schedule]);
-
-  // Find existing submitted match record for this schedule to display read-only.
-  // Captains only see this once they're blocked from re-submitting; admins can see
-  // it (and reset it, see canDeleteMatch below) any time the schedule already has a result.
-  const existingMatch = useMemo(() => {
-    const schedId = loadedLineupFixture?.item?.id || targetScheduleId;
-    if (!schedId) return null;
-    if (session.role === ROLES.CAPTAIN) {
-      if (!scoreBlocked) return null;
-      const mySubmission = lineupSubmissions?.[schedId]?.[session.teamId];
-      if (!mySubmission?.scoreSavedAt) return null;
-    }
-    return (matches || []).find(m => m.scheduleId === schedId || m.matchScheduleId === schedId) || null;
-  }, [scoreBlocked, loadedLineupFixture, targetScheduleId, lineupSubmissions, session, matches]);
+  }, [session, scheduleMatchId, lineupSubmissions, schedule, existingMatch]);
 
   const displayExistingMatch = existingMatch && editingMatchId !== existingMatch.id;
 
@@ -1303,7 +1296,7 @@ function FormEntry({ teams, matches, schedule, lineupSubmissions, revealedLineup
       // One score per team per schedule in round-robin (playoff/final matches are exempt)
       const fixture = schedId ? schedule?.[schedId] : null;
       const isPlayoff = fixture?.matchType === 'playoff' || !fixture?.group;
-      if (!isPlayoff && mySubmission?.scoreSavedAt) {
+      if (!isPlayoff && mySubmission?.scoreSavedAt && existingMatch) {
         setError('You have already submitted a score for this match. Only one score submission is allowed per team per round-robin match.');
         return;
       }

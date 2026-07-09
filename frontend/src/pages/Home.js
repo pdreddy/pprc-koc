@@ -44,6 +44,17 @@ function pairKey(a, b) {
 }
 
 
+function matchForFixture(fixture, matches = [], teams = {}) {
+  if (!fixture) return null;
+  return (matches || []).find(match => {
+    if (match.scheduleId === fixture.id || match.matchScheduleId === fixture.id) return true;
+    if (match.scheduleId || match.matchScheduleId) return false;
+    const { team1, team2 } = resolveMatchTeams(match, teams);
+    const ids = [team1?.id, team2?.id, match.t1Id, match.t2Id].filter(Boolean);
+    return ids.includes(fixture.team1Id) && ids.includes(fixture.team2Id);
+  }) || null;
+}
+
 const LINEUP_ROLE_SLOTS = [
   { code: 'S1', label: 'Singles' },
   { code: 'D1', label: 'Doubles 1 player A' },
@@ -352,7 +363,8 @@ const CaptainFixtureCard = React.memo(function CaptainFixtureCard({ item, teams,
   const opponent = item.team1Id === captainTeam.id ? team2 : team1;
   const locked = !!lineupSubmission?.lockedAt && !lineupSubmission?.unlockedAt;
   const revealed = !!revealedLineup?.revealId || !!lineupSubmission?.revealedAt || (!!lineupSubmission?.lockedAt && !!opponentSubmission?.lockedAt);
-  const scoreAlreadySaved = !!lineupSubmission?.scoreSavedAt;
+  const savedScoreMatch = matchForFixture(item, matches, teams);
+  const scoreAlreadySaved = !!savedScoreMatch;
   const isPlayoff = item?.matchType === 'playoff' || !item?.group;
   const status = statusForFixture(completed, lineupSubmission, opponentSubmission);
   const errors = validateDashboardLineup(captainTeam, selected, matches, teams, eligibilityRules);
@@ -572,7 +584,7 @@ const CaptainFixtureCard = React.memo(function CaptainFixtureCard({ item, teams,
             </span>
           </div>
           {!locked && !completed && <div style={{ fontSize: '.75rem', color: '#b45309', marginTop: '.25rem', display: 'flex', alignItems: 'center', gap: '.3rem' }}><span>⚠️</span> Submit your lineup before score entry.</div>}
-          {scoreAlreadySaved && !isPlayoff && !completed && <div style={{ fontSize: '.75rem', color: '#15803d', marginTop: '.25rem', display: 'flex', alignItems: 'center', gap: '.3rem' }}><span>✅</span> Score submitted {timeLabel(lineupSubmission.scoreSavedAt)}.</div>}
+          {scoreAlreadySaved && !isPlayoff && !completed && <div style={{ fontSize: '.75rem', color: '#15803d', marginTop: '.25rem', display: 'flex', alignItems: 'center', gap: '.3rem' }}><span>✅</span> Score submitted {timeLabel(lineupSubmission?.scoreSavedAt || savedScoreMatch?.updatedAt || savedScoreMatch?.ts)}.</div>}
         </div>
         <div className="captain-fixture-actions">
           {!completed && !locked && <button type="button" className="btn small cfc-btn-lines" onClick={() => setExpanded(v => !v)} data-testid={`submit-lines-${item.id}`}>{expanded ? 'Hide Lines' : 'Submit Lines'}</button>}
@@ -758,14 +770,7 @@ function CompletedMatchList({ title, description, fixtures, teams, matches, capt
   const [expanded, setExpanded] = useState({});
   const toggle = id => setExpanded(prev => ({ ...prev, [id]: !prev[id] }));
 
-  const findMatch = fixture => {
-    if (!matches?.length) return null;
-    return matches.find(m => {
-      const { team1, team2 } = resolveMatchTeams(m, teams);
-      const ids = [team1?.id, team2?.id, m.t1Id, m.t2Id].filter(Boolean);
-      return ids.includes(fixture.team1Id) && ids.includes(fixture.team2Id);
-    }) || null;
-  };
+  const findMatch = fixture => matchForFixture(fixture, matches, teams);
 
   return (
     <section className="card" style={{ marginTop: '1rem' }} data-testid={testid}>
@@ -1041,20 +1046,30 @@ export default function Home({ teams, schedule, matches = [], eligibilityRules =
     if (!captainTeam) return [];
     return sortedFixtures.filter(item => item.team1Id === captainTeam.id || item.team2Id === captainTeam.id);
   }, [captainTeam, sortedFixtures]);
-  const completedFixtureKeys = useMemo(() => {
+  const completedFixtureIds = useMemo(() => {
+    const ids = new Set();
+    approvedMatches(matches).forEach(match => {
+      const scheduleId = match.scheduleId || match.matchScheduleId;
+      if (scheduleId) ids.add(scheduleId);
+    });
+    return ids;
+  }, [matches]);
+  const completedPairKeys = useMemo(() => {
     const keys = new Set();
     approvedMatches(matches).forEach(match => {
+      if (match.scheduleId || match.matchScheduleId) return;
       const { team1, team2 } = resolveMatchTeams(match, teams);
       if (team1?.id && team2?.id) keys.add(pairKey(team1.id, team2.id));
     });
     return keys;
   }, [matches, teams]);
+  const isFixtureCompleted = item => item.status === 'completed' || completedFixtureIds.has(item.id) || completedPairKeys.has(pairKey(item.team1Id, item.team2Id));
   const completedCaptainFixtures = useMemo(() => captainFixtures
-    .filter(item => item.status === 'completed' || completedFixtureKeys.has(pairKey(item.team1Id, item.team2Id)))
-    .map(item => ({ ...item, homeStatus: 'Completed' })), [captainFixtures, completedFixtureKeys]);
+    .filter(isFixtureCompleted)
+    .map(item => ({ ...item, homeStatus: 'Completed' })), [captainFixtures, completedFixtureIds, completedPairKeys]);
   const upcomingCaptainFixtures = useMemo(() => captainFixtures
-    .filter(item => item.status !== 'completed' && !completedFixtureKeys.has(pairKey(item.team1Id, item.team2Id)))
-    .map(item => ({ ...item, homeStatus: 'Upcoming' })), [captainFixtures, completedFixtureKeys]);
+    .filter(item => !isFixtureCompleted(item))
+    .map(item => ({ ...item, homeStatus: 'Upcoming' })), [captainFixtures, completedFixtureIds, completedPairKeys]);
   const overdueFixtures = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);

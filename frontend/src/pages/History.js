@@ -5,6 +5,7 @@ import { ref, remove, update } from 'firebase/database';
 import { db, PATHS } from '../firebase';
 import { ScoreProcessingService } from '../services/ScoreProcessingService';
 import { clearLineupScoreMarkers } from '../utils/lineupScoreMarkers';
+import { archiveScoreSnapshot } from '../utils/scoreArchive';
 import { writeAuditLog } from '../services/AuditService';
 import { isAdminRole } from '../utils/roles';
 import { matchTeamNames, matchWinnerId } from '../utils/matchTeams';
@@ -22,6 +23,7 @@ export default function History({ matches, teams, onMatchDeleted }) {
   const handleDelete = async (m, names) => {
     if (!window.confirm(`Delete match ${names.t1Name} vs ${names.t2Name}?`)) return;
     try {
+      await archiveScoreSnapshot({ ...m, id: m.id }, { action: 'delete', session, reason: 'Deleted from Match History' });
       await remove(ref(db, `${PATHS.matches}/${m.id}`));
       await clearLineupScoreMarkers({ ...m, id: m.id });
       const scheduleId = m.scheduleId || m.matchScheduleId;

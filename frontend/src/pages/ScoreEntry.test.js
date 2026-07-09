@@ -3,12 +3,14 @@ jest.mock('../firebase', () => ({
   ensureAuth: jest.fn(),
   PATHS: {
     lineupSubmissions: 'koc_s3/lineupSubmissions',
-    lineupSubmissionMeta: 'koc_s3/lineupSubmissionMeta'
+    lineupSubmissionMeta: 'koc_s3/lineupSubmissionMeta',
+    scoreArchive: 'koc_s3/scoreArchive'
   }
 }));
 
 import { buildLineupCourts, courtsFromMatch, scoreLineupFixtures, validateEligibilityForLines } from './ScoreEntry';
 import { buildLineupScoreClearUpdates } from '../utils/lineupScoreMarkers';
+import { buildScoreArchiveUpdates } from '../utils/scoreArchive';
 
 const teams = {
   rr: {
@@ -244,4 +246,23 @@ test('courtsFromMatch maps previous S1/D1/D2 score labels back into editable cou
   expect(courts[3].p1).toEqual(['RR D2 A', 'RR D2 B']);
   expect(courts[3].p2).toEqual(['BB D2 A', 'BB D2 B']);
   expect(courts[0].sets[0]).toMatchObject({ a: '4', b: '1' });
+});
+
+
+test('buildScoreArchiveUpdates writes current and immutable event snapshots', () => {
+  const updates = buildScoreArchiveUpdates({ id: 'match-1', t1Id: 'rr', t2Id: 'bb', courtsWon1: 3, courtsWon2: 2 }, { action: 'delete', session: { role: 'SUPER_ADMIN' }, now: 999, reason: 'test delete' });
+
+  expect(updates['koc_s3/scoreArchive/match-1/current']).toMatchObject({
+    id: 'match-1',
+    archiveAction: 'delete',
+    archiveReason: 'test delete',
+    archivedBy: 'SUPER_ADMIN',
+    archivedAt: 999
+  });
+  expect(updates['koc_s3/scoreArchive/match-1/events/999_delete']).toMatchObject({
+    id: 'match-1',
+    courtsWon1: 3,
+    courtsWon2: 2,
+    archiveAction: 'delete'
+  });
 });

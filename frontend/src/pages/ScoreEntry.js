@@ -601,8 +601,17 @@ function SetRow({ idx, set, onChange, disabled, isMatchTieBreak = false, team1Ab
   );
 }
 
-function courtFromMatchLine(line) {
-  const template = COURT_TEMPLATES.find(t => t.label === line?.label) || { label: line?.label || 'Court', type: line?.type === 'singles' ? 'singles' : 'doubles', setCount: line?.type === 'singles' ? 5 : 3 };
+function courtLabelKey(label = '') {
+  const normalized = shareLabel(label).toLowerCase();
+  if (normalized === 's1' || normalized.startsWith('single')) return 'Singles';
+  if (normalized === 'd1' || normalized.includes('doubles 1')) return 'Doubles 1';
+  if (normalized === 'd2' || normalized.includes('doubles 2')) return 'Doubles 2';
+  return label;
+}
+
+function courtFromMatchLine(line, fallbackTemplate = null) {
+  const normalizedLabel = courtLabelKey(line?.label || fallbackTemplate?.label || '');
+  const template = COURT_TEMPLATES.find(t => t.label === normalizedLabel) || fallbackTemplate || { label: normalizedLabel || line?.label || 'Court', type: line?.type === 'singles' ? 'singles' : 'doubles', setCount: line?.type === 'singles' ? 5 : 3 };
   const sets = newCourt(template.label, template.type, template.setCount).sets.map((set, idx) => {
     const saved = line?.sets?.[idx];
     if (!saved) return set;
@@ -623,9 +632,9 @@ function courtFromMatchLine(line) {
   };
 }
 
-function courtsFromMatch(match) {
-  const linesByLabel = new Map((match?.lines || []).map(line => [line.label, line]));
-  return COURT_TEMPLATES.map(template => courtFromMatchLine(linesByLabel.get(template.label) || { label: template.label, type: template.type }));
+export function courtsFromMatch(match) {
+  const linesByLabel = new Map((match?.lines || []).map(line => [courtLabelKey(line.label), line]));
+  return COURT_TEMPLATES.map(template => courtFromMatchLine(linesByLabel.get(template.label) || { label: template.label, type: template.type }, template));
 }
 
 function computeCourt(c) {
@@ -1036,7 +1045,7 @@ async function markLineupConvertedToScore(record, session) {
   if (Object.keys(updates).length) await update(ref(db), updates);
 }
 
-function ScoreLineupLoader({ fixtures, teams, selectedId, onSelectedId, onLoad, mode }) {
+function ScoreLineupLoader({ fixtures, teams, selectedId, onSelectedId, onLoad, mode, suppressEligibilityWarnings = false }) {
   if (!fixtures.length) return null;
   const selected = fixtures.find(row => [row.revealId, row.revealCode, row.item?.id].filter(Boolean).map(String).includes(String(selectedId))) || fixtures[0];
   const { item, ready, revealed, eligibilityErrors = [] } = selected;
@@ -1059,7 +1068,7 @@ function ScoreLineupLoader({ fixtures, teams, selectedId, onSelectedId, onLoad, 
         <button className="btn small success" type="button" disabled={!ready} onClick={() => onLoad(selected)} data-testid={`${mode}-load-submitted-lineup`}>Load submitted lines</button>
       </div>
       <p className="hint">{team1?.name || 'Team 1'} vs {team2?.name || 'Team 2'} · {revealed ? (ready ? 'Revealed and ready to load into score entry.' : 'Revealed, but submitted lineup data is incomplete.') : (ready ? 'Both lineups are locked and ready while the reveal record syncs.' : 'Waiting for both captains to submit before line details are available.')}</p>
-      {eligibilityErrors.length > 0 && <div className="error-box" style={{ whiteSpace: 'pre-line', marginTop: '.65rem' }} data-testid={`${mode}-revealed-lineup-eligibility-error`}>Eligibility warning — lines can still be loaded, but save will re-check these rules:\n{eligibilityErrors.join('\n')}</div>}
+      {!suppressEligibilityWarnings && eligibilityErrors.length > 0 && <div className="error-box" style={{ whiteSpace: 'pre-line', marginTop: '.65rem' }} data-testid={`${mode}-revealed-lineup-eligibility-error`}>Eligibility warning — lines can still be loaded, but save will re-check these rules:\n{eligibilityErrors.join('\n')}</div>}
     </div>
   );
 }
@@ -1375,7 +1384,7 @@ function FormEntry({ teams, matches, schedule, lineupSubmissions, revealedLineup
       setError('Please enter at least one court with scores.');
       return;
     }
-    validateEligibilityForLines(lines, team1, team2, matches, teams, eligibilityRules, { matchId: editingMatchId || targetMatchId, scheduleId: loadedLineupFixture?.item?.id || targetScheduleId || existingMatch?.scheduleId || existingMatch?.matchScheduleId }).forEach(message => addValidationError(message));
+    if (!isAdmin) validateEligibilityForLines(lines, team1, team2, matches, teams, eligibilityRules, { matchId: editingMatchId || targetMatchId, scheduleId: loadedLineupFixture?.item?.id || targetScheduleId || existingMatch?.scheduleId || existingMatch?.matchScheduleId }).forEach(message => addValidationError(message));
     if (validationErrors.length > 0) {
       setFieldErrors(nextFieldErrors);
       setError(validationErrors.join('\n'));
@@ -1515,6 +1524,7 @@ function FormEntry({ teams, matches, schedule, lineupSubmissions, revealedLineup
           selectedId={selectedScheduleId || targetRevealId || targetScheduleId}
           onSelectedId={setSelectedScheduleId}
           mode="form"
+          suppressEligibilityWarnings={isAdmin}
           onLoad={(row) => { setCourts(buildLineupCourts(row.team1Names, row.team2Names)); setLoadedLineupFixture(row); recordLineupAudit({ actionType: 'Lineup Loaded For Score Entry', session, scheduleId: row.item.id, teamId: session.teamId || team1Id, metadata: { revealId: row.revealId, revealCode: row.revealCode, viewedAt: Date.now() } }).catch(() => {}); setError(''); setSuccess(`Loaded submitted dashboard lineup for schedule code ${fixtureCode(row.item)}.`); setShareText(''); setPendingRecord(null); }}
         />
       )}

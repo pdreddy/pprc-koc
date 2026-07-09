@@ -7,7 +7,7 @@ jest.mock('../firebase', () => ({
   }
 }));
 
-import { buildLineupCourts, scoreLineupFixtures, validateEligibilityForLines } from './ScoreEntry';
+import { buildLineupCourts, courtsFromMatch, scoreLineupFixtures, validateEligibilityForLines } from './ScoreEntry';
 import { buildLineupScoreClearUpdates } from '../utils/lineupScoreMarkers';
 
 const teams = {
@@ -210,4 +210,38 @@ test('validateEligibilityForLines excludes the current schedule when rechecking 
     .toContain('Prashanth Jayantha Kumar: singles limit exceeded (3/2 Singles Days)');
   expect(validateEligibilityForLines(lines, localTeams.rr, localTeams.bb, existingMatches, localTeams, { maxSinglesDays: 2, maxTotalMatchDays: 10, maxPartnerDays: 10 }, { scheduleId: 'A-r1-m1' }))
     .not.toContain('Prashanth Jayantha Kumar: singles limit exceeded (3/2 Singles Days)');
+});
+
+
+test('courtsFromMatch maps previous S1/D1/D2 score labels back into editable courts', () => {
+  const courts = courtsFromMatch({
+    lines: [
+      {
+        label: 'S1',
+        type: 'singles',
+        players: { team1: ['RR Singles'], team2: ['BB Singles'] },
+        sets: [{ team1: 4, team2: 1 }]
+      },
+      {
+        label: 'D1',
+        type: 'doubles',
+        players: { team1: ['RR D1 A', 'RR D1 B'], team2: ['BB D1 A', 'BB D1 B'] },
+        sets: [{ team1: 4, team2: 2 }]
+      },
+      {
+        label: 'D2',
+        type: 'doubles',
+        players: { team1: ['RR D2 A', 'RR D2 B'], team2: ['BB D2 A', 'BB D2 B'] },
+        sets: [{ team1: 4, team2: 0 }]
+      }
+    ]
+  });
+
+  expect(courts[0].p1).toEqual(['RR Singles']);
+  expect(courts[0].p2).toEqual(['BB Singles']);
+  expect(courts[1].p1).toEqual(['RR D1 A', 'RR D1 B']);
+  expect(courts[1].p2).toEqual(['BB D1 A', 'BB D1 B']);
+  expect(courts[3].p1).toEqual(['RR D2 A', 'RR D2 B']);
+  expect(courts[3].p2).toEqual(['BB D2 A', 'BB D2 B']);
+  expect(courts[0].sets[0]).toMatchObject({ a: '4', b: '1' });
 });

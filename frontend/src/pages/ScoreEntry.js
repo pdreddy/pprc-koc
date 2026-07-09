@@ -1455,7 +1455,7 @@ function FormEntry({ teams, matches, schedule, lineupSubmissions, revealedLineup
       if (pendingRecord.scheduleId) {
         await update(ref(db, `${PATHS.schedule}/${pendingRecord.scheduleId}`), { status: 'completed', completedAt: pendingRecord.updatedAt || Date.now(), scoreMatchId: saved.key }).catch(error => console.warn('Schedule score sync skipped:', error?.message || error));
       }
-      const savedRecord = { ...saved.matchRecord, scheduleId: pendingRecord.scheduleId, matchScheduleId: pendingRecord.matchScheduleId, revealId: pendingRecord.revealId, revealCode: pendingRecord.revealCode, lineupSource: pendingRecord.lineupSource };
+      const savedRecord = { ...saved.matchRecord, id: saved.key, scheduleId: pendingRecord.scheduleId, matchScheduleId: pendingRecord.matchScheduleId, revealId: pendingRecord.revealId, revealCode: pendingRecord.revealCode, lineupSource: pendingRecord.lineupSource };
       await archiveScoreSnapshot(savedRecord, { action: editingMatchId ? 'edit' : 'save', session, reason: editingMatchId ? 'Edited from Score Entry' : 'Saved from Score Entry' });
       onScoreSaved?.(savedRecord);
       await writeAuditLog({ actionType: editingMatchId ? 'Score Edit' : 'Score Entry', session, targetType: 'match', targetId: saved.key, newValue: savedRecord, oldValue: editingMatchId ? existingMatch : undefined });
@@ -1886,7 +1886,7 @@ function QuickEntry({ teams, matches, schedule, lineupSubmissions, revealedLineu
       await ensureAuth();
       const saved = await ScoreProcessingService.updateAfterScoreEntry(pendingRecord, { session });
       await markLineupConvertedToScore(pendingRecord, session);
-      const savedRecord = { ...saved.matchRecord, scheduleId: pendingRecord.scheduleId, matchScheduleId: pendingRecord.matchScheduleId, revealId: pendingRecord.revealId, revealCode: pendingRecord.revealCode, lineupSource: pendingRecord.lineupSource };
+      const savedRecord = { ...saved.matchRecord, id: saved.key, scheduleId: pendingRecord.scheduleId, matchScheduleId: pendingRecord.matchScheduleId, revealId: pendingRecord.revealId, revealCode: pendingRecord.revealCode, lineupSource: pendingRecord.lineupSource };
       await archiveScoreSnapshot(savedRecord, { action: 'save', session, reason: 'Saved from Quick Score Entry' });
       onScoreSaved?.(savedRecord);
       await writeAuditLog({ actionType: 'Score Entry', session, targetType: 'match', targetId: saved.key, newValue: savedRecord });

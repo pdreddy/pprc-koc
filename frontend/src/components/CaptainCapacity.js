@@ -60,7 +60,6 @@ export function buildCaptainCapacityRows(team, teams, matches, eligibilityRules 
     const submission = scheduleSubmissions?.[team?.id];
     const submissionScheduleId = submission?.scheduleId || scheduleId;
     if (submissionScheduleId && scoredScheduleIds.has(String(submissionScheduleId))) return;
-    if (submission?.convertedToScoreAt || submission?.scoreSavedAt) return;
     if (!submission?.lockedAt || submission?.unlockedAt || !Array.isArray(submission.lineup)) return;
     const dayPlayers = new Map();
     const dayPairs = new Set();

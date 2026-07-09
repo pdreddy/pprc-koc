@@ -25,11 +25,14 @@ export default function History({ matches, teams, onMatchDeleted }) {
     try {
       await archiveScoreSnapshot({ ...m, id: m.id }, { action: 'delete', session, reason: 'Deleted from Match History' });
       await remove(ref(db, `${PATHS.matches}/${m.id}`));
+      // Core: recompute standings/ratings/history from the remaining match records before any
+      // best-effort/auxiliary metadata sync, so a denied marker/schedule write can never leave
+      // aggregates counting a match that no longer exists.
+      await ScoreProcessingService.processMatchResult(null, { session, matchRecord: { ...m, id: m.id } });
+      onMatchDeleted?.(m.id);
       await clearLineupScoreMarkers({ ...m, id: m.id });
       const scheduleId = m.scheduleId || m.matchScheduleId;
       if (scheduleId) await update(ref(db, `${PATHS.schedule}/${scheduleId}`), { status: null, completedAt: null, scoreMatchId: null }).catch(error => console.warn('Schedule delete sync skipped:', error?.message || error));
-      onMatchDeleted?.(m.id);
-      await ScoreProcessingService.processMatchResult(null, { session, matchRecord: { ...m, id: m.id } });
       await writeAuditLog({ actionType: 'Score Delete', session, targetType: 'match', targetId: m.id, oldValue: m });
     } catch (e) {
       alert('Delete failed: ' + e.message);

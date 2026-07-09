@@ -1,3 +1,5 @@
+const mockUpdate = jest.fn();
+
 jest.mock('../firebase', () => ({
   db: {},
   ensureAuth: jest.fn(),
@@ -8,7 +10,15 @@ jest.mock('../firebase', () => ({
   }
 }));
 
-import { buildLineupCourts, courtsFromMatch, scoreLineupFixtures, validateEligibilityForLines } from './ScoreEntry';
+jest.mock('firebase/database', () => ({
+  ref: (_db, path = '') => path,
+  update: (...args) => mockUpdate(...args),
+  remove: jest.fn(),
+  get: jest.fn(),
+  push: jest.fn()
+}));
+
+import { buildLineupConvertScoreUpdates, buildLineupCourts, courtsFromMatch, markLineupConvertedToScore, scoreLineupFixtures, validateEligibilityForLines } from './ScoreEntry';
 import { buildLineupScoreClearUpdates } from '../utils/lineupScoreMarkers';
 import { buildScoreArchiveUpdates } from '../utils/scoreArchive';
 
@@ -177,6 +187,54 @@ test('buildLineupScoreClearUpdates clears saved score markers for both teams', (
   });
 });
 
+
+test('buildLineupConvertScoreUpdates marks both teams saved for schedule + meta paths', () => {
+  const updates = buildLineupConvertScoreUpdates(
+    { scheduleId: 'A-r1-m1', t1Id: 'rr', t2Id: 'bb' },
+    { teamId: 'rr' },
+    54321
+  );
+
+  expect(updates).toMatchObject({
+    'koc_s3/lineupSubmissions/A-r1-m1/rr/scoreSavedAt': 54321,
+    'koc_s3/lineupSubmissions/A-r1-m1/rr/convertedToScoreAt': 54321,
+    'koc_s3/lineupSubmissions/A-r1-m1/rr/scoreSavedBy': 'rr',
+    'koc_s3/lineupSubmissions/A-r1-m1/bb/scoreSavedAt': 54321,
+    'koc_s3/lineupSubmissionMeta/A-r1-m1/bb/convertedToScoreAt': 54321,
+    'koc_s3/lineupSubmissionMeta/A-r1-m1/bb/scoreSavedBy': 'rr',
+    'koc_s3/lineupSubmissionMeta/A-r1-m1/bb/lastUpdatedAt': 54321
+  });
+});
+
+test('buildLineupConvertScoreUpdates returns nothing without a schedule id', () => {
+  expect(buildLineupConvertScoreUpdates({ t1Id: 'rr', t2Id: 'bb' }, {})).toEqual({});
+});
+
+describe('markLineupConvertedToScore is best-effort', () => {
+  const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+  afterEach(() => { mockUpdate.mockReset(); warn.mockClear(); });
+  afterAll(() => warn.mockRestore());
+
+  test('resolves without throwing when the metadata write is denied', async () => {
+    mockUpdate.mockRejectedValueOnce(new Error('PERMISSION_DENIED'));
+    const result = await markLineupConvertedToScore(
+      { scheduleId: 'A-r1-m1', t1Id: 'rr', t2Id: 'bb' },
+      { role: 'SUPER_ADMIN' }
+    );
+    expect(result).toMatchObject({ ok: false, skipped: true });
+    expect(warn).toHaveBeenCalledWith('Schedule score sync skipped:', 'PERMISSION_DENIED');
+  });
+
+  test('reports success when the metadata write is allowed', async () => {
+    mockUpdate.mockResolvedValueOnce();
+    const result = await markLineupConvertedToScore(
+      { scheduleId: 'A-r1-m1', t1Id: 'rr', t2Id: 'bb' },
+      { teamId: 'rr' }
+    );
+    expect(result).toMatchObject({ ok: true, skipped: false });
+    expect(mockUpdate).toHaveBeenCalledTimes(1);
+  });
+});
 
 test('validateEligibilityForLines excludes the current schedule when rechecking a saved score', () => {
   const lines = [

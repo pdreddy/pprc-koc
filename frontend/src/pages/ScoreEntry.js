@@ -1453,7 +1453,7 @@ function FormEntry({ teams, matches, schedule, lineupSubmissions, revealedLineup
       if (editingMatchId) await ScoreProcessingService.processMatchResult(editingMatchId, { session, matchRecord: saved.matchRecord, writeMatchRecord: true });
       await markLineupConvertedToScore(pendingRecord, session);
       if (pendingRecord.scheduleId) {
-        await update(ref(db, `${PATHS.schedule}/${pendingRecord.scheduleId}`), { status: 'completed', completedAt: pendingRecord.updatedAt || Date.now(), scoreMatchId: saved.key });
+        await update(ref(db, `${PATHS.schedule}/${pendingRecord.scheduleId}`), { status: 'completed', completedAt: pendingRecord.updatedAt || Date.now(), scoreMatchId: saved.key }).catch(error => console.warn('Schedule score sync skipped:', error?.message || error));
       }
       const savedRecord = { ...saved.matchRecord, scheduleId: pendingRecord.scheduleId, matchScheduleId: pendingRecord.matchScheduleId, revealId: pendingRecord.revealId, revealCode: pendingRecord.revealCode, lineupSource: pendingRecord.lineupSource };
       await archiveScoreSnapshot(savedRecord, { action: editingMatchId ? 'edit' : 'save', session, reason: editingMatchId ? 'Edited from Score Entry' : 'Saved from Score Entry' });

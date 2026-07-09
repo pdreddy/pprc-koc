@@ -27,7 +27,7 @@ export default function History({ matches, teams, onMatchDeleted }) {
       await remove(ref(db, `${PATHS.matches}/${m.id}`));
       await clearLineupScoreMarkers({ ...m, id: m.id });
       const scheduleId = m.scheduleId || m.matchScheduleId;
-      if (scheduleId) await update(ref(db, `${PATHS.schedule}/${scheduleId}`), { status: null, completedAt: null, scoreMatchId: null });
+      if (scheduleId) await update(ref(db, `${PATHS.schedule}/${scheduleId}`), { status: null, completedAt: null, scoreMatchId: null }).catch(error => console.warn('Schedule delete sync skipped:', error?.message || error));
       onMatchDeleted?.(m.id);
       await ScoreProcessingService.processMatchResult(null, { session, matchRecord: { ...m, id: m.id } });
       await writeAuditLog({ actionType: 'Score Delete', session, targetType: 'match', targetId: m.id, oldValue: m });

@@ -26,5 +26,12 @@ export function buildScoreArchiveUpdates(matchRecord, { action = 'snapshot', ses
 
 export async function archiveScoreSnapshot(matchRecord, options = {}) {
   const updates = buildScoreArchiveUpdates(matchRecord, options);
-  if (Object.keys(updates).length) await update(ref(db), updates);
+  if (!Object.keys(updates).length) return { ok: true, skipped: true };
+  try {
+    await update(ref(db), updates);
+    return { ok: true, skipped: false };
+  } catch (error) {
+    console.warn('Score archive write skipped:', error?.message || error);
+    return { ok: false, skipped: true, error };
+  }
 }

@@ -173,7 +173,10 @@ export default function Schedule({ teams, schedule, matches = [], lineupSubmissi
     const byTeamPair = {};
     approvedMatchList.forEach(match => {
       const scheduleId = match.scheduleId || match.matchScheduleId;
-      if (scheduleId && !byScheduleId[scheduleId]) byScheduleId[scheduleId] = match;
+      if (scheduleId) {
+        if (!byScheduleId[scheduleId]) byScheduleId[scheduleId] = match;
+        return;
+      }
       const names = matchTeamNames(match, teams);
       const pair = teamPairKey(names.team1Id, names.team2Id);
       if (pair && !byTeamPair[pair]) byTeamPair[pair] = match;
@@ -299,7 +302,7 @@ export default function Schedule({ teams, schedule, matches = [], lineupSubmissi
 
         const completedCount = visible.filter(m => {
           const details = fixtureDetailsById[m.id] || {};
-          return m.status === 'completed' || details.scoreReady;
+          return details.scoreReady;
         }).length;
 
         return (
@@ -325,8 +328,8 @@ export default function Schedule({ teams, schedule, matches = [], lineupSubmissi
                 {filterGroup === 'all' && (() => {
                   const grpA = visible.filter(m => m.group === 'A');
                   const grpB = visible.filter(m => m.group === 'B');
-                  const doneA = grpA.filter(m => m.status === 'completed' || (fixtureDetailsById[m.id] || {}).scoreReady).length;
-                  const doneB = grpB.filter(m => m.status === 'completed' || (fixtureDetailsById[m.id] || {}).scoreReady).length;
+                  const doneA = grpA.filter(m => (fixtureDetailsById[m.id] || {}).scoreReady).length;
+                  const doneB = grpB.filter(m => (fixtureDetailsById[m.id] || {}).scoreReady).length;
                   return (
                     <div style={{ display: 'flex', gap: '.3rem', flexShrink: 0 }}>
                       {grpA.length > 0 && <span style={{ fontSize: '.62rem', background: '#dbeafe', color: '#1e3a8a', padding: '.1rem .35rem', borderRadius: 10, fontWeight: 700 }}>A {doneA}/{grpA.length}</span>}
@@ -348,7 +351,7 @@ export default function Schedule({ teams, schedule, matches = [], lineupSubmissi
                 const textColor = label === 'A' ? '#1e3a8a' : '#9a3412';
                 const doneCount = items.filter(m => {
                   const d = fixtureDetailsById[m.id] || {};
-                  return m.status === 'completed' || d.scoreReady;
+                  return d.scoreReady;
                 }).length;
                 return (
                   <div key={label} style={{ marginBottom: '.5rem' }}>
@@ -361,9 +364,9 @@ export default function Schedule({ teams, schedule, matches = [], lineupSubmissi
                         const details = fixtureDetailsById[m.id] || {};
                         return (
                           <div key={m.id}>
-                            {(m.status === 'completed' || m.status === 'cancelled') && (
+                            {(details.scoreReady || m.status === 'cancelled') && (
                               <div style={{ display: 'flex', gap: '.3rem', marginBottom: '.2rem' }}>
-                                {m.status === 'completed' && <span className="tag win" style={{ fontSize: '.65rem' }}>Played</span>}
+                                {details.scoreReady && <span className="tag win" style={{ fontSize: '.65rem' }}>Played</span>}
                                 {m.status === 'cancelled' && <span className="tag lose" style={{ fontSize: '.65rem' }}>Cancelled</span>}
                               </div>
                             )}
@@ -371,7 +374,7 @@ export default function Schedule({ teams, schedule, matches = [], lineupSubmissi
                               m={m}
                               t1={teams[m.team1Id]}
                               t2={teams[m.team2Id]}
-                              isCompleted={m.status === 'completed' || details.scoreReady}
+                              isCompleted={!!details.scoreReady}
                               lineupReady={!!details.lineupReady}
                               scoreReady={!!details.scoreReady}
                               lineupOpen={!!openLineups[m.id]}

@@ -46,7 +46,7 @@ function pairKey(a, b) {
 
 function matchForFixture(fixture, matches = [], teams = {}) {
   if (!fixture) return null;
-  return (matches || []).find(match => {
+  return approvedMatches(matches).find(match => {
     if (match.scheduleId === fixture.id || match.matchScheduleId === fixture.id) return true;
     if (match.scheduleId || match.matchScheduleId) return false;
     const { team1, team2 } = resolveMatchTeams(match, teams);
@@ -1063,7 +1063,7 @@ export default function Home({ teams, schedule, matches = [], eligibilityRules =
     });
     return keys;
   }, [matches, teams]);
-  const isFixtureCompleted = item => item.status === 'completed' || completedFixtureIds.has(item.id) || completedPairKeys.has(pairKey(item.team1Id, item.team2Id));
+  const isFixtureCompleted = item => completedFixtureIds.has(item.id) || completedPairKeys.has(pairKey(item.team1Id, item.team2Id));
   const completedCaptainFixtures = useMemo(() => captainFixtures
     .filter(isFixtureCompleted)
     .map(item => ({ ...item, homeStatus: 'Completed' })), [captainFixtures, completedFixtureIds, completedPairKeys]);

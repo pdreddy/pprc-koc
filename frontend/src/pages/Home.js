@@ -94,12 +94,16 @@ function buildDashboardLineupLines(names) {
   ];
 }
 
+function eligibilityNameKey(playerName) {
+  return String(playerName || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
 function eligibilityPlayerKey(teamId, playerName) {
-  return `${teamId || ''}:${String(playerName || '').trim().toLowerCase()}`;
+  return `${teamId || ''}:${eligibilityNameKey(playerName)}`;
 }
 
 function eligibilityPairKey(teamId, names) {
-  return `${teamId || ''}:${[...(names || [])].map(name => String(name || '').trim().toLowerCase()).sort().join('|')}`;
+  return `${teamId || ''}:${[...(names || [])].map(eligibilityNameKey).sort().join('|')}`;
 }
 
 function buildExistingEligibility(matches, teams) {

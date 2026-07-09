@@ -284,3 +284,42 @@ test('buildScoreArchiveUpdates writes current and immutable event snapshots', ()
     archiveAction: 'delete'
   });
 });
+
+test('validateEligibilityForLines matches saved names with punctuation when enforcing caps', () => {
+  const localTeams = {
+    rr: { ...teams.rr, players: [{ name: 'CSK Opponent' }] },
+    bb: { ...teams.bb, players: [{ name: 'Prashanth Jayantha Kumar' }] }
+  };
+  const currentLines = [
+    { type: 'singles', players: { team1: ['CSK Opponent'], team2: ['Prashanth Jayantha Kumar'] } }
+  ];
+  const existingMatches = [
+    {
+      id: 'm1',
+      scheduleId: 'sched-one',
+      status: 'APPROVED',
+      t1Id: 'rr',
+      t2Id: 'bb',
+      lines: [
+        { type: 'singles', players: { team1: ['CSK Opponent'], team2: ['  Prashanth  Jayantha-Kumar!! '] } }
+      ]
+    },
+    {
+      id: 'm2',
+      scheduleId: 'sched-two',
+      status: 'APPROVED',
+      t1Id: 'rr',
+      t2Id: 'bb',
+      lines: [
+        { type: 'doubles', players: { team1: ['CSK Opponent', 'RR D1 A'], team2: ['Prashanth Jayantha Kumar', 'BB D1 A'] } },
+        { type: 'doubles', players: { team1: ['CSK Opponent', 'RR D1 A'], team2: ['Prashanth Jayantha Kumar', 'BB D1 A'] } }
+      ]
+    }
+  ];
+
+  expect(validateEligibilityForLines(currentLines, localTeams.rr, localTeams.bb, existingMatches, localTeams, { maxSinglesDays: 1, maxTotalMatchDays: 2, maxPartnerDays: 10 }))
+    .toEqual(expect.arrayContaining([
+      'Prashanth Jayantha Kumar: singles limit exceeded (2/1 Singles Days)',
+      'Prashanth Jayantha Kumar: match-day limit exceeded (3/2 Match Days)'
+    ]));
+});

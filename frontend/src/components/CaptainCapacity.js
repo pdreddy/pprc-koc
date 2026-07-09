@@ -4,7 +4,7 @@ import { resolveMatchTeams } from '../utils/matchTeams';
 import { DEFAULT_ELIGIBILITY_RULES, normalizeEligibilityRules } from '../utils/eligibilityRules';
 
 function playerKey(name) {
-  return String(name || '').toLowerCase().replace(/[^a-z0-9 ]/g, '').replace(/\s+/g, ' ').trim();
+  return String(name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
 function rowForPlayer(rows, name) {

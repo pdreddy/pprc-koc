@@ -106,3 +106,22 @@ test('same player counts once per scored match day but across separate saved day
   expect(row.singlesDays).toBe(1);
   expect(row.totalMatchDays).toBe(2);
 });
+
+test('capacity matches saved player names with punctuation and spacing differences', () => {
+  const rows = buildCaptainCapacityRows(team, teams, [{
+    id: 'm3',
+    scheduleId: 'sched3',
+    t1Id: 'bb',
+    t2Id: 'rr',
+    status: 'APPROVED',
+    lines: [
+      { type: 'singles', players: { team1: ['  A!!  '], team2: ['Z'] } },
+      { type: 'doubles', players: { team1: ['B', 'C'], team2: ['Y', 'X'] } },
+      { type: 'doubles', players: { team1: ['B', 'C'], team2: ['W', 'V'] } }
+    ]
+  }], rules, {});
+  expect(rows.find(row => row.name === 'A').singlesDays).toBe(1);
+  expect(rows.find(row => row.name === 'A').totalMatchDays).toBe(1);
+  expect(rows.find(row => row.name === 'B').doublesDays).toBe(1);
+  expect(rows.find(row => row.name === 'B').totalMatchDays).toBe(1);
+});

@@ -4,7 +4,15 @@ import { resolveMatchTeams } from '../utils/matchTeams';
 import { DEFAULT_ELIGIBILITY_RULES, normalizeEligibilityRules } from '../utils/eligibilityRules';
 
 function playerKey(name) {
-  return String(name || '').trim().toLowerCase();
+  return String(name || '').toLowerCase().replace(/[^a-z0-9 ]/g, '').replace(/\s+/g, ' ').trim();
+}
+
+function rowForPlayer(rows, name) {
+  const key = playerKey(name);
+  if (rows.has(key)) return rows.get(key);
+  const compact = key.replace(/ /g, '');
+  if (!compact) return null;
+  return Array.from(rows.entries()).find(([rowKey]) => rowKey.replace(/ /g, '') === compact)?.[1] || null;
 }
 
 export function buildCaptainCapacityRows(team, teams, matches, eligibilityRules = DEFAULT_ELIGIBILITY_RULES, lineupSubmissions = {}) {
@@ -34,7 +42,7 @@ export function buildCaptainCapacityRows(team, teams, matches, eligibilityRules 
       if (line.type === 'doubles' && names.length === 2) dayPairs.add(names.map(playerKey).sort().join('|'));
     });
     dayPlayers.forEach(day => {
-      const row = rows.get(playerKey(day.name));
+      const row = rowForPlayer(rows, day.name);
       if (!row) return;
       if (day.singles) row.singlesDays += 1;
       if (day.doubles) row.doublesDays += 1;
@@ -69,7 +77,7 @@ export function buildCaptainCapacityRows(team, teams, matches, eligibilityRules 
       if (type === 'doubles' && names.length === 2) dayPairs.add(names.map(playerKey).sort().join('|'));
     });
     dayPlayers.forEach(day => {
-      const row = rows.get(playerKey(day.name));
+      const row = rowForPlayer(rows, day.name);
       if (!row) return;
       if (day.singles) row.singlesDays += 1;
       if (day.doubles) row.doublesDays += 1;

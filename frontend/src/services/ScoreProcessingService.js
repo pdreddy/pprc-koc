@@ -153,7 +153,7 @@ function computePlayerEligibility(teams, matches) {
       const row = rows[day.key] || { playerId: day.key, playerName: day.name, teamId: day.teamId, seasonId: 'koc_s3', totalMatchDays: 0, singlesDays: 0, doublesDays: 0, partnerHistory: {} };
       if (day.singles) row.singlesDays += 1;
       if (day.doubles) row.doublesDays += 1;
-      row.totalMatchDays = row.singlesDays + row.doublesDays;
+      row.totalMatchDays += 1;
       rows[day.key] = row;
     });
   });

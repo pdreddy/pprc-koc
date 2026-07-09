@@ -1374,7 +1374,7 @@ function FormEntry({ teams, matches, schedule, lineupSubmissions, revealedLineup
           }
           const m = matchName(trimmed, team.players || []);
           if (!m.exact && !m.matched) {
-            addValidationError(`${c.label}: "${trimmed}" not found in ${team.name}`, c.label);
+            if (!isAdmin) addValidationError(`${c.label}: "${trimmed}" not found in ${team.name}`, c.label);
             return trimmed;
           }
           return (m.matched || { name: trimmed }).name;

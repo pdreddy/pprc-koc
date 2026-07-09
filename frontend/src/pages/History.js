@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { ref, remove } from 'firebase/database';
 import { db, PATHS } from '../firebase';
 import { ScoreProcessingService } from '../services/ScoreProcessingService';
-import { clearLineupScoreMarkers } from './ScoreEntry';
+import { clearLineupScoreMarkers } from '../utils/lineupScoreMarkers';
 import { writeAuditLog } from '../services/AuditService';
 import { isAdminRole } from '../utils/roles';
 import { matchTeamNames, matchWinnerId } from '../utils/matchTeams';

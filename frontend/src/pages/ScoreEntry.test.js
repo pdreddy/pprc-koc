@@ -7,7 +7,8 @@ jest.mock('../firebase', () => ({
   }
 }));
 
-import { buildLineupCourts, scoreLineupFixtures, buildLineupScoreClearUpdates } from './ScoreEntry';
+import { buildLineupCourts, scoreLineupFixtures } from './ScoreEntry';
+import { buildLineupScoreClearUpdates } from '../utils/lineupScoreMarkers';
 
 const teams = {
   rr: {

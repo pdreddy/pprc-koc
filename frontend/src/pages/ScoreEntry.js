@@ -11,6 +11,7 @@ import { resolveMatchTeams } from '../utils/matchTeams';
 import { DEFAULT_ELIGIBILITY_RULES, normalizeEligibilityRules } from '../utils/eligibilityRules';
 import { parseQuickScore } from '../utils/quickScoreParser';
 import { regularSetWinner, validateLineScore } from '../utils/tennisScoreRules';
+import { clearLineupScoreMarkers } from '../utils/lineupScoreMarkers';
 import TeamLogo from '../components/TeamLogo';
 import { WhatsAppShareButton } from '../components/WhatsAppIcon';
 
@@ -1011,27 +1012,6 @@ export function scoreLineupFixtures(schedule, revealedLineups, lineupSubmissions
   });
 
   return Array.from(rows.values());
-}
-
-export function buildLineupScoreClearUpdates(record, now = Date.now()) {
-  if (!record?.scheduleId) return {};
-  const updates = {};
-  [record.t1Id, record.t2Id].filter(Boolean).forEach(teamId => {
-    updates[`${PATHS.lineupSubmissions}/${record.scheduleId}/${teamId}/scoreSavedAt`] = null;
-    updates[`${PATHS.lineupSubmissions}/${record.scheduleId}/${teamId}/scoreSavedBy`] = null;
-    updates[`${PATHS.lineupSubmissions}/${record.scheduleId}/${teamId}/convertedToScoreAt`] = null;
-    updates[`${PATHS.lineupSubmissions}/${record.scheduleId}/${teamId}/lastUpdatedAt`] = now;
-    updates[`${PATHS.lineupSubmissionMeta}/${record.scheduleId}/${teamId}/scoreSavedAt`] = null;
-    updates[`${PATHS.lineupSubmissionMeta}/${record.scheduleId}/${teamId}/scoreSavedBy`] = null;
-    updates[`${PATHS.lineupSubmissionMeta}/${record.scheduleId}/${teamId}/convertedToScoreAt`] = null;
-    updates[`${PATHS.lineupSubmissionMeta}/${record.scheduleId}/${teamId}/lastUpdatedAt`] = now;
-  });
-  return updates;
-}
-
-export async function clearLineupScoreMarkers(record) {
-  const updates = buildLineupScoreClearUpdates(record);
-  if (Object.keys(updates).length) await update(ref(db), updates);
 }
 
 

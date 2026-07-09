@@ -1155,6 +1155,7 @@ function FormEntry({ teams, matches, schedule, lineupSubmissions, revealedLineup
   }, [team1Id, team2Id, team1, team2, targetScheduleId, schedule, myTeam, setTeam2Id]);
 
   useEffect(() => {
+    if (targetMatchId) return;
     const exact = submittedLineupFixtures.find(row => lineupFixtureMatchesTarget(row, targetScheduleId, targetRevealId));
     const target = exact || (submittedLineupFixtures.length === 1 ? submittedLineupFixtures[0] : null);
     if (!target?.ready || autoLoadedRevealId === target.revealId) return;
@@ -1182,7 +1183,7 @@ function FormEntry({ teams, matches, schedule, lineupSubmissions, revealedLineup
       setSuccess(`Loaded submitted dashboard lineup for schedule code ${target.revealCode || fixtureCode(target.item)}.`);
       setError('');
     }
-  }, [submittedLineupFixtures, autoLoadedRevealId, session, team1Id, targetScheduleId, targetRevealId, lineupSubmissions, schedule, existingMatch]);
+  }, [submittedLineupFixtures, autoLoadedRevealId, session, team1Id, targetScheduleId, targetRevealId, targetMatchId, lineupSubmissions, schedule, existingMatch]);
 
   const updateCourt = (idx, patch) => {
     setPendingRecord(null);
@@ -1216,7 +1217,10 @@ function FormEntry({ teams, matches, schedule, lineupSubmissions, revealedLineup
   const startEditExistingScore = () => {
     if (!existingMatch) return;
     setCourts(courtsFromMatch(existingMatch));
-    setLoadedLineupFixture(previous => previous || (existingMatch.scheduleId ? { item: schedule?.[existingMatch.scheduleId] || { id: existingMatch.scheduleId, team1Id: existingMatch.t1Id, team2Id: existingMatch.t2Id }, revealId: existingMatch.revealId, revealCode: existingMatch.revealCode, source: existingMatch.lineupSource || 'existingMatch', ready: true } : null));
+    setLoadedLineupFixture(previous => {
+      const editScheduleId = existingMatch.scheduleId || existingMatch.matchScheduleId;
+      return previous || (editScheduleId ? { item: schedule?.[editScheduleId] || { id: editScheduleId, team1Id: existingMatch.t1Id, team2Id: existingMatch.t2Id }, revealId: existingMatch.revealId, revealCode: existingMatch.revealCode, source: existingMatch.lineupSource || 'existingMatch', ready: true } : null);
+    });
     setEditingMatchId(existingMatch.id);
     setError('');
     setSuccess('Editing saved score. Review/correct the courts below, then preview and save.');

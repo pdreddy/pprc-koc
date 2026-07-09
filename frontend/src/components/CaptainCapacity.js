@@ -26,9 +26,9 @@ export function buildCaptainCapacityRows(team, teams, matches, eligibilityRules 
       const names = line.players?.[side] || [];
       names.forEach(name => {
         const key = playerKey(name);
-        const current = dayPlayers.get(key) || { name, singles: false, doubles: false };
+        const current = dayPlayers.get(key) || { name, singles: false, doublesAppearances: 0 };
         if (line.type === 'singles') current.singles = true;
-        if (line.type === 'doubles') current.doubles = true;
+        if (line.type === 'doubles') current.doublesAppearances += 1;
         dayPlayers.set(key, current);
       });
       if (line.type === 'doubles' && names.length === 2) dayPairs.add(names.map(playerKey).sort().join('|'));
@@ -37,7 +37,7 @@ export function buildCaptainCapacityRows(team, teams, matches, eligibilityRules 
       const row = rows.get(playerKey(day.name));
       if (!row) return;
       if (day.singles) row.singlesDays += 1;
-      if (day.doubles) row.doublesDays += 1;
+      row.doublesDays += day.doublesAppearances;
       row.totalMatchDays = row.singlesDays + row.doublesDays;
     });
     dayPairs.forEach(pairKeyValue => {
@@ -61,9 +61,9 @@ export function buildCaptainCapacityRows(team, teams, matches, eligibilityRules 
       const names = line.players || [];
       names.forEach(name => {
         const key = playerKey(name);
-        const current = dayPlayers.get(key) || { name, singles: false, doubles: false };
+        const current = dayPlayers.get(key) || { name, singles: false, doublesAppearances: 0 };
         if (type === 'singles') current.singles = true;
-        if (type === 'doubles') current.doubles = true;
+        if (type === 'doubles') current.doublesAppearances += 2;
         dayPlayers.set(key, current);
       });
       if (type === 'doubles' && names.length === 2) dayPairs.add(names.map(playerKey).sort().join('|'));
@@ -72,7 +72,7 @@ export function buildCaptainCapacityRows(team, teams, matches, eligibilityRules 
       const row = rows.get(playerKey(day.name));
       if (!row) return;
       if (day.singles) row.singlesDays += 1;
-      if (day.doubles) row.doublesDays += 1;
+      row.doublesDays += day.doublesAppearances;
       row.totalMatchDays = row.singlesDays + row.doublesDays;
     });
     dayPairs.forEach(pairKeyValue => {

@@ -28,7 +28,7 @@ test('locked lineup counts before score entry', () => {
     }
   });
   expect(rows.find(row => row.name === 'A').singlesDays).toBe(1);
-  expect(rows.find(row => row.name === 'B').doublesDays).toBe(1);
+  expect(rows.find(row => row.name === 'B').doublesDays).toBe(2);
 });
 
 test('approved score does not double-count the same schedule lineup', () => {
@@ -39,7 +39,8 @@ test('approved score does not double-count the same schedule lineup', () => {
     status: 'APPROVED',
     lines: [
       { type: 'singles', players: { team1: ['A'], team2: ['Z'] } },
-      { type: 'doubles', players: { team1: ['B', 'C'], team2: ['Y', 'X'] } }
+      { type: 'doubles', players: { team1: ['B', 'C'], team2: ['Y', 'X'] } },
+      { type: 'doubles', players: { team1: ['B', 'C'], team2: ['W', 'V'] } }
     ]
   }], rules, {
     sched1: {
@@ -54,8 +55,8 @@ test('approved score does not double-count the same schedule lineup', () => {
     }
   });
   expect(rows.find(row => row.name === 'A').singlesDays).toBe(1);
-  expect(rows.find(row => row.name === 'B').doublesDays).toBe(1);
-  expect(rows.find(row => row.name === 'B').totalMatchDays).toBe(1);
+  expect(rows.find(row => row.name === 'B').doublesDays).toBe(2);
+  expect(rows.find(row => row.name === 'B').totalMatchDays).toBe(2);
 });
 
 test('converted locked lineup does not count after score conversion marker', () => {

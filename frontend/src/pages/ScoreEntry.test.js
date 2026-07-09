@@ -215,7 +215,7 @@ test('validateEligibilityForLines excludes the current schedule when rechecking 
 });
 
 
-test('courtsFromMatch maps previous S1/D1/D2 score labels back into editable courts', () => {
+test('courtsFromMatch maps previous S1/D1/D2 score labels back into every editable court', () => {
   const courts = courtsFromMatch({
     lines: [
       {
@@ -231,22 +231,40 @@ test('courtsFromMatch maps previous S1/D1/D2 score labels back into editable cou
         sets: [{ team1: 4, team2: 2 }]
       },
       {
+        label: 'D1',
+        type: 'doubles',
+        players: { team1: ['RR D1 A', 'RR D1 B'], team2: ['BB D2 A', 'BB D2 B'] },
+        sets: [{ team1: 3, team2: 4 }]
+      },
+      {
         label: 'D2',
         type: 'doubles',
         players: { team1: ['RR D2 A', 'RR D2 B'], team2: ['BB D2 A', 'BB D2 B'] },
         sets: [{ team1: 4, team2: 0 }]
+      },
+      {
+        label: 'D2',
+        type: 'doubles',
+        players: { team1: ['RR D2 A', 'RR D2 B'], team2: ['BB D1 A', 'BB D1 B'] },
+        sets: [{ team1: 2, team2: 4 }]
       }
     ]
   });
 
   expect(courts[0].p1).toEqual(['RR Singles']);
-  expect(courts[0].p2).toEqual(['BB Singles']);
   expect(courts[1].p1).toEqual(['RR D1 A', 'RR D1 B']);
   expect(courts[1].p2).toEqual(['BB D1 A', 'BB D1 B']);
+  expect(courts[2].p1).toEqual(['RR D1 A', 'RR D1 B']);
+  expect(courts[2].p2).toEqual(['BB D2 A', 'BB D2 B']);
   expect(courts[3].p1).toEqual(['RR D2 A', 'RR D2 B']);
   expect(courts[3].p2).toEqual(['BB D2 A', 'BB D2 B']);
+  expect(courts[4].p1).toEqual(['RR D2 A', 'RR D2 B']);
+  expect(courts[4].p2).toEqual(['BB D1 A', 'BB D1 B']);
   expect(courts[0].sets[0]).toMatchObject({ a: '4', b: '1' });
+  expect(courts[2].sets[0]).toMatchObject({ a: '3', b: '4' });
+  expect(courts[4].sets[0]).toMatchObject({ a: '2', b: '4' });
 });
+
 
 
 test('buildScoreArchiveUpdates writes current and immutable event snapshots', () => {

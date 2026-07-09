@@ -634,8 +634,18 @@ function courtFromMatchLine(line, fallbackTemplate = null) {
 }
 
 export function courtsFromMatch(match) {
-  const linesByLabel = new Map((match?.lines || []).map(line => [courtLabelKey(line.label), line]));
-  return COURT_TEMPLATES.map(template => courtFromMatchLine(linesByLabel.get(template.label) || { label: template.label, type: template.type }, template));
+  const linesByLabel = new Map();
+  (match?.lines || []).forEach(line => {
+    const key = courtLabelKey(line.label);
+    const bucket = linesByLabel.get(key) || [];
+    bucket.push(line);
+    linesByLabel.set(key, bucket);
+  });
+  return COURT_TEMPLATES.map(template => {
+    const key = courtLabelKey(template.label);
+    const line = (linesByLabel.get(key) || []).shift();
+    return courtFromMatchLine(line || { label: template.label, type: template.type }, template);
+  });
 }
 
 function computeCourt(c) {

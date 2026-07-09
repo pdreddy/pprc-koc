@@ -5,6 +5,7 @@ import { resolveMatchTeams, matchWinnerId, lineWinnerSide } from '../utils/match
 import { DEFAULT_ELIGIBILITY_RULES, normalizeEligibilityRules } from '../utils/eligibilityRules';
 import { approvedMatches, isApprovedMatch } from '../utils/matchStatus';
 import { validateLineScore } from '../utils/tennisScoreRules';
+import { isAdminRole } from '../utils/roles';
 
 const keyFor = (value) => String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'unknown';
 const listFrom = (val) => Object.entries(val || {}).map(([id, value]) => ({ id, ...(value || {}) }));
@@ -165,7 +166,7 @@ function computePlayerEligibility(teams, matches) {
 }
 
 
-function assertEligibilityRules(teams, matches, eligibilityRules = DEFAULT_ELIGIBILITY_RULES) {
+function assertEligibilityRules(teams, matches, eligibilityRules = DEFAULT_ELIGIBILITY_RULES, { enforce = true } = {}) {
   const rules = normalizeEligibilityRules(eligibilityRules);
   const rows = computePlayerEligibility(teams, matches);
   const errors = [];
@@ -196,7 +197,11 @@ function assertEligibilityRules(teams, matches, eligibilityRules = DEFAULT_ELIGI
       if (row.doublesCount > 0 && row.doublesCount !== 2) errors.push(`${row.name}: doubles players must play both Doubles and Reverse Doubles`);
     });
   });
-  if (errors.length > 0) throw new Error(`Player eligibility validation failed:\n${Array.from(new Set(errors)).join('\n')}`);
+  if (errors.length > 0) {
+    const message = `Player eligibility validation failed:\n${Array.from(new Set(errors)).join('\n')}`;
+    if (enforce) throw new Error(message);
+    console.warn('Admin score processing eligibility warnings skipped:', message);
+  }
   return rows;
 }
 
@@ -223,7 +228,7 @@ export class ScoreProcessingService {
     const approved = approvedMatches(matches);
     if (current && isApprovedMatch(current)) validateScore(current);
     approved.forEach(validateScore);
-    const playerEligibility = assertEligibilityRules(teams, approved, settingsSnap.val()?.eligibilityRules);
+    const playerEligibility = assertEligibilityRules(teams, approved, settingsSnap.val()?.eligibilityRules, { enforce: !isAdminRole(session) });
     const standings = computeStandings(teams, approved); const pprcRatings = buildPtlRatings(teams, approved, ratingsSnap.val() || {}); const histories = computeHistories(teams, approved);
     const updatedBy = session?.teamId || session?.role || 'system'; const meta = { updatedAt: now, updatedBy, version: now };
     const matchUpdates = matchId ? (writeMatchRecord

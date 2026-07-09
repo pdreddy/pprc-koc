@@ -10,6 +10,7 @@
         ".write": "auth != null",
         ".indexOn": ["ts", "week", "t1Id", "t2Id"]
       },
+      "scoreArchive": { ".read": "auth != null", ".write": "auth != null" },
       "playerRatings": { ".read": "auth != null", ".write": "auth != null" },
       "admin": { ".read": "auth != null", ".write": "auth != null" },
       "adminUsers": { ".read": "auth != null", ".write": "auth != null" },

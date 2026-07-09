@@ -210,7 +210,12 @@ export class ScoreProcessingService {
     const teams = teamsSnap.val() || {};
     let matches = listFrom(matchesSnap.val());
     const current = matchRecord || matches.find(m => m.id === matchId);
-    if (matchRecord && matchId && !matches.some(m => m.id === matchId)) matches = [...matches, { ...matchRecord, id: matchId }];
+    if (matchRecord && matchId) {
+      const normalizedRecord = { ...matchRecord, id: matchId };
+      matches = matches.some(m => m.id === matchId)
+        ? matches.map(m => (m.id === matchId ? normalizedRecord : m))
+        : [...matches, normalizedRecord];
+    }
     const approved = approvedMatches(matches);
     if (current && isApprovedMatch(current)) validateScore(current);
     approved.forEach(validateScore);

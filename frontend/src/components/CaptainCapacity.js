@@ -26,9 +26,9 @@ export function buildCaptainCapacityRows(team, teams, matches, eligibilityRules 
       const names = line.players?.[side] || [];
       names.forEach(name => {
         const key = playerKey(name);
-        const current = dayPlayers.get(key) || { name, singles: false, doublesAppearances: 0 };
+        const current = dayPlayers.get(key) || { name, singles: false, doubles: false };
         if (line.type === 'singles') current.singles = true;
-        if (line.type === 'doubles') current.doublesAppearances += 1;
+        if (line.type === 'doubles') current.doubles = true;
         dayPlayers.set(key, current);
       });
       if (line.type === 'doubles' && names.length === 2) dayPairs.add(names.map(playerKey).sort().join('|'));
@@ -37,8 +37,8 @@ export function buildCaptainCapacityRows(team, teams, matches, eligibilityRules 
       const row = rows.get(playerKey(day.name));
       if (!row) return;
       if (day.singles) row.singlesDays += 1;
-      row.doublesDays += day.doublesAppearances;
-      row.totalMatchDays = row.singlesDays + row.doublesDays;
+      if (day.doubles) row.doublesDays += 1;
+      row.totalMatchDays += 1;
     });
     dayPairs.forEach(pairKeyValue => {
       pairKeyValue.split('|').forEach(key => {
@@ -61,9 +61,9 @@ export function buildCaptainCapacityRows(team, teams, matches, eligibilityRules 
       const names = line.players || [];
       names.forEach(name => {
         const key = playerKey(name);
-        const current = dayPlayers.get(key) || { name, singles: false, doublesAppearances: 0 };
+        const current = dayPlayers.get(key) || { name, singles: false, doubles: false };
         if (type === 'singles') current.singles = true;
-        if (type === 'doubles') current.doublesAppearances += 2;
+        if (type === 'doubles') current.doubles = true;
         dayPlayers.set(key, current);
       });
       if (type === 'doubles' && names.length === 2) dayPairs.add(names.map(playerKey).sort().join('|'));
@@ -72,8 +72,8 @@ export function buildCaptainCapacityRows(team, teams, matches, eligibilityRules 
       const row = rows.get(playerKey(day.name));
       if (!row) return;
       if (day.singles) row.singlesDays += 1;
-      row.doublesDays += day.doublesAppearances;
-      row.totalMatchDays = row.singlesDays + row.doublesDays;
+      if (day.doubles) row.doublesDays += 1;
+      row.totalMatchDays += 1;
     });
     dayPairs.forEach(pairKeyValue => {
       pairKeyValue.split('|').forEach(key => {

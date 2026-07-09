@@ -28,7 +28,7 @@ test('locked lineup counts before score entry', () => {
     }
   });
   expect(rows.find(row => row.name === 'A').singlesDays).toBe(1);
-  expect(rows.find(row => row.name === 'B').doublesDays).toBe(2);
+  expect(rows.find(row => row.name === 'B').doublesDays).toBe(1);
 });
 
 test('approved score does not double-count the same schedule lineup', () => {
@@ -55,8 +55,8 @@ test('approved score does not double-count the same schedule lineup', () => {
     }
   });
   expect(rows.find(row => row.name === 'A').singlesDays).toBe(1);
-  expect(rows.find(row => row.name === 'B').doublesDays).toBe(2);
-  expect(rows.find(row => row.name === 'B').totalMatchDays).toBe(2);
+  expect(rows.find(row => row.name === 'B').doublesDays).toBe(1);
+  expect(rows.find(row => row.name === 'B').totalMatchDays).toBe(1);
 });
 
 test('converted locked lineup does not count after score conversion marker', () => {
@@ -75,4 +75,34 @@ test('converted locked lineup does not count after score conversion marker', () 
   });
   expect(rows.find(row => row.name === 'A').singlesDays).toBe(0);
   expect(rows.find(row => row.name === 'B').doublesDays).toBe(0);
+});
+
+test('same player counts once per scored match day but across separate saved days', () => {
+  const rows = buildCaptainCapacityRows(team, teams, [
+    {
+      id: 'm1',
+      scheduleId: 'sched1',
+      t1Id: 'bb',
+      t2Id: 'rr',
+      status: 'APPROVED',
+      lines: [
+        { type: 'doubles', players: { team1: ['B', 'C'], team2: ['Y', 'X'] } },
+        { type: 'doubles', players: { team1: ['B', 'C'], team2: ['W', 'V'] } }
+      ]
+    },
+    {
+      id: 'm2',
+      scheduleId: 'sched2',
+      t1Id: 'bb',
+      t2Id: 'rr',
+      status: 'APPROVED',
+      lines: [
+        { type: 'singles', players: { team1: ['B'], team2: ['Z'] } }
+      ]
+    }
+  ], rules, {});
+  const row = rows.find(item => item.name === 'B');
+  expect(row.doublesDays).toBe(1);
+  expect(row.singlesDays).toBe(1);
+  expect(row.totalMatchDays).toBe(2);
 });

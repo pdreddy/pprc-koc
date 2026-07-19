@@ -1043,21 +1043,37 @@ export function scoreLineupFixtures(schedule, revealedLineups, lineupSubmissions
 }
 
 
-async function markLineupConvertedToScore(record, session) {
-  if (!record?.scheduleId) return;
-  const now = Date.now();
+export function buildLineupConvertScoreUpdates(record, session, now = Date.now()) {
+  if (!record?.scheduleId) return {};
+  const savedBy = session?.teamId || session?.userId || session?.role || 'unknown';
   const updates = {};
   [record.t1Id, record.t2Id].filter(Boolean).forEach(teamId => {
     updates[`${PATHS.lineupSubmissions}/${record.scheduleId}/${teamId}/convertedToScoreAt`] = now;
     updates[`${PATHS.lineupSubmissions}/${record.scheduleId}/${teamId}/scoreSavedAt`] = now;
-    updates[`${PATHS.lineupSubmissions}/${record.scheduleId}/${teamId}/scoreSavedBy`] = session?.teamId || session?.userId || session?.role || 'unknown';
+    updates[`${PATHS.lineupSubmissions}/${record.scheduleId}/${teamId}/scoreSavedBy`] = savedBy;
     updates[`${PATHS.lineupSubmissions}/${record.scheduleId}/${teamId}/lastUpdatedAt`] = now;
     updates[`${PATHS.lineupSubmissionMeta}/${record.scheduleId}/${teamId}/convertedToScoreAt`] = now;
     updates[`${PATHS.lineupSubmissionMeta}/${record.scheduleId}/${teamId}/scoreSavedAt`] = now;
-    updates[`${PATHS.lineupSubmissionMeta}/${record.scheduleId}/${teamId}/scoreSavedBy`] = session?.teamId || session?.userId || session?.role || 'unknown';
+    updates[`${PATHS.lineupSubmissionMeta}/${record.scheduleId}/${teamId}/scoreSavedBy`] = savedBy;
     updates[`${PATHS.lineupSubmissionMeta}/${record.scheduleId}/${teamId}/lastUpdatedAt`] = now;
   });
-  if (Object.keys(updates).length) await update(ref(db), updates);
+  return updates;
+}
+
+// Marking a locked lineup as converted-to-score is best-effort schedule metadata:
+// Firebase rules may deny it (e.g. a Super Admin editing another team's match), and that
+// must never abort the core score save/edit or block the follow-up UI sync (onScoreSaved,
+// audit log, share text). Mirror archiveScoreSnapshot: swallow the error and log a skip.
+export async function markLineupConvertedToScore(record, session) {
+  const updates = buildLineupConvertScoreUpdates(record, session);
+  if (!Object.keys(updates).length) return { ok: true, skipped: true };
+  try {
+    await update(ref(db), updates);
+    return { ok: true, skipped: false };
+  } catch (error) {
+    console.warn('Schedule score sync skipped:', error?.message || error);
+    return { ok: false, skipped: true, error };
+  }
 }
 
 function ScoreLineupLoader({ fixtures, teams, selectedId, onSelectedId, onLoad, mode, suppressEligibilityWarnings = false }) {

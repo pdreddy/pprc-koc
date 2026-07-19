@@ -1,4 +1,8 @@
-const functions = require('firebase-functions');
+// Use the v1 API explicitly. firebase-functions v6 no longer exposes the v1
+// namespaces (functions.database.*) on the default export — they live under the
+// /v1 subpath — so requiring the bare package makes functions.database undefined
+// and `functions.database.ref` throws "is not a function" at load time.
+const functions = require('firebase-functions/v1');
 const admin = require('firebase-admin');
 
 admin.initializeApp();

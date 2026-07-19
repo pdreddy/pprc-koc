@@ -73,12 +73,25 @@ async function markInvalidSubmission(root, scheduleId, teamId, errors) {
   await writeSystemLineupAudit(root, { actionType: 'Lineup Validation Failed', scheduleId, teamId, metadata: { validationErrors: errors, lastUpdatedAt: now } });
 }
 
+// Trigger on the `lockedAt` leaf (a single timestamp) rather than the whole
+// submission node. Realtime Database caps a Cloud Function's event payload at
+// 1 MB and rejects the client write itself — before the function runs — whenever
+// the resulting trigger event (before + after snapshot at the watched path) would
+// exceed that limit. Watching the full node made captains' lineup writes fail with
+// `TRIGGER_PAYLOAD_TOO_LARGE` once a submission node grew large. Scoping the
+// trigger to a scalar keeps the event tiny so writes always succeed, and it also
+// stops the reveal writes below (revealedAt/revealId/status) from re-triggering
+// this function. `lockedAt` changes exactly when reveal logic needs to run.
 exports.revealLineupsOnLock = functions.database
-  .ref(`/${SEASON_ROOT}/lineupSubmissions/{scheduleId}/{teamId}`)
+  .ref(`/${SEASON_ROOT}/lineupSubmissions/{scheduleId}/{teamId}/lockedAt`)
   .onWrite(async (change, context) => {
-    const after = change.after.val();
     const { scheduleId, teamId } = context.params;
     const root = admin.database().ref(SEASON_ROOT);
+
+    // Read the full submission server-side; the trigger event only carries the
+    // lockedAt timestamp, and a server read has no payload-size limit.
+    const submissionSnap = await root.child(`lineupSubmissions/${scheduleId}/${teamId}`).get();
+    const after = submissionSnap.val();
 
     if (!after) {
       await root.child(`lineupSubmissionMeta/${scheduleId}/${teamId}`).remove();

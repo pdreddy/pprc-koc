@@ -2,11 +2,30 @@ import { push, ref } from 'firebase/database';
 import { db, PATHS } from '../firebase';
 import { normalizeRole } from '../utils/roles';
 
-function sanitizeAuditValue(value) {
+const MAX_AUDIT_DEPTH = 6;
+const MAX_AUDIT_ARRAY_ITEMS = 50;
+const MAX_AUDIT_OBJECT_KEYS = 80;
+const MAX_AUDIT_STRING_LENGTH = 1000;
+
+function sanitizeAuditValue(value, depth = 0) {
   if (value === undefined) return null;
-  if (value === null || typeof value !== 'object') return value;
-  if (Array.isArray(value)) return value.map(sanitizeAuditValue);
-  return Object.fromEntries(Object.entries(value).map(([key, child]) => [key, sanitizeAuditValue(child)]));
+  if (value === null || typeof value !== 'object') {
+    if (typeof value === 'string' && value.length > MAX_AUDIT_STRING_LENGTH) {
+      return `${value.slice(0, MAX_AUDIT_STRING_LENGTH)}…[truncated ${value.length - MAX_AUDIT_STRING_LENGTH} chars]`;
+    }
+    return value;
+  }
+  if (depth >= MAX_AUDIT_DEPTH) return '[truncated: max audit depth reached]';
+  if (Array.isArray(value)) {
+    const items = value.slice(0, MAX_AUDIT_ARRAY_ITEMS).map(child => sanitizeAuditValue(child, depth + 1));
+    if (value.length > MAX_AUDIT_ARRAY_ITEMS) items.push(`[truncated ${value.length - MAX_AUDIT_ARRAY_ITEMS} items]`);
+    return items;
+  }
+  const entries = Object.entries(value).slice(0, MAX_AUDIT_OBJECT_KEYS);
+  const sanitized = Object.fromEntries(entries.map(([key, child]) => [key, sanitizeAuditValue(child, depth + 1)]));
+  const remaining = Object.keys(value).length - entries.length;
+  if (remaining > 0) sanitized.__truncatedKeys = remaining;
+  return sanitized;
 }
 
 export async function writeAuditLog({ actionType, session, targetType, targetId, oldValue = null, newValue = null }) {
@@ -28,8 +47,13 @@ export async function writeAuditLog({ actionType, session, targetType, targetId,
     device: /Mobi|Android|iPhone|iPad/i.test(ua) ? 'mobile' : 'desktop',
     browser: ua.slice(0, 240)
   };
-  await push(ref(db, PATHS.auditLogs), record);
-  return record;
+  try {
+    await push(ref(db, PATHS.auditLogs), record);
+    return { ...record, auditWriteStatus: 'written' };
+  } catch (error) {
+    console.warn('Audit log write skipped:', error?.message || error);
+    return { ...record, auditWriteStatus: 'skipped', auditWriteError: error?.code || error?.message || 'unknown' };
+  }
 }
 
 

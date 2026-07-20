@@ -6,6 +6,7 @@ const seasonPath = (child) => `${CURRENT_SEASON_ROOT}/${child}`;
 export const PATHS = {
   teams: seasonPath('teams'),
   matches: seasonPath('matches'),
+  scoreArchive: seasonPath('scoreArchive'),
   playerRatings: seasonPath('playerRatings'),
   admin: seasonPath('admin'),
   adminUsers: seasonPath('adminUsers'),
@@ -21,6 +22,7 @@ export const PATHS = {
   cachedSummaries: seasonPath('cachedSummaries'),
   auditLogs: seasonPath('auditLogs'),
   lineupSubmissions: seasonPath('lineupSubmissions'),
+  lineupSubmissionDetails: seasonPath('lineupSubmissionDetails'),
   lineupSubmissionMeta: seasonPath('lineupSubmissionMeta'),
   revealedLineups: seasonPath('revealedLineups'),
   lineupUnlocks: seasonPath('lineupUnlocks'),

@@ -15,6 +15,7 @@ import { DEFAULT_ELIGIBILITY_RULES, normalizeEligibilityRules } from './utils/el
 import BottomNav from './components/BottomNav';
 import AppHeader from './components/Header';
 import { writeAuditLog } from './services/AuditService';
+import { updateInChunks } from './utils/firebaseWrites';
 
 const pageImports = {
   Home:      () => import('./pages/Home'),
@@ -229,7 +230,7 @@ function Shell() {
         if (!rSnap.exists()) {
           await set(ref(db, PATHS.playerRatings), { ...buildUtrRatingsTable(), ...buildAuctionPlayerRatingsTable() });
         } else {
-          await update(ref(db, PATHS.playerRatings), auctionPlayerRatingUpdates());
+          await updateInChunks(db, Object.fromEntries(Object.entries(auctionPlayerRatingUpdates()).map(([key, value]) => [`${PATHS.playerRatings}/${key}`, value])));
         }
 
         // Schedule — seed if missing or stale
@@ -327,7 +328,7 @@ function Shell() {
       return undefined;
     }
     setRevealedScheduleSubmissions(prev => Object.fromEntries(Object.entries(prev || {}).filter(([scheduleId]) => scheduleIds.includes(scheduleId))));
-    const unsubs = scheduleIds.map(scheduleId => onValue(ref(db, `${PATHS.lineupSubmissions}/${scheduleId}`), (snap) => {
+    const unsubs = scheduleIds.map(scheduleId => onValue(ref(db, `${PATHS.lineupSubmissionDetails}/${scheduleId}`), (snap) => {
       setRevealedScheduleSubmissions(prev => ({ ...prev, [scheduleId]: snap.val() || null }));
       touchLastRefreshed();
     }, () => {
@@ -346,7 +347,7 @@ function Shell() {
       setOwnLineupSubmissions({});
       return undefined;
     }
-    const unsubs = scheduleIds.map(scheduleId => onValue(ref(db, `${PATHS.lineupSubmissions}/${scheduleId}/${session.teamId}`), (snap) => {
+    const unsubs = scheduleIds.map(scheduleId => onValue(ref(db, `${PATHS.lineupSubmissionDetails}/${scheduleId}/${session.teamId}`), (snap) => {
       setOwnLineupSubmissions(prev => ({ ...prev, [scheduleId]: snap.val() || null }));
       touchLastRefreshed();
     }));

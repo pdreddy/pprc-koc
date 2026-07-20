@@ -13,6 +13,7 @@ import { parseQuickScore } from '../utils/quickScoreParser';
 import { regularSetWinner, validateLineScore } from '../utils/tennisScoreRules';
 import { clearLineupScoreMarkers } from '../utils/lineupScoreMarkers';
 import { archiveScoreSnapshot } from '../utils/scoreArchive';
+import { updateInChunks } from '../utils/firebaseWrites';
 import TeamLogo from '../components/TeamLogo';
 import { WhatsAppShareButton } from '../components/WhatsAppIcon';
 
@@ -1048,16 +1049,16 @@ async function markLineupConvertedToScore(record, session) {
   const now = Date.now();
   const updates = {};
   [record.t1Id, record.t2Id].filter(Boolean).forEach(teamId => {
-    updates[`${PATHS.lineupSubmissions}/${record.scheduleId}/${teamId}/convertedToScoreAt`] = now;
-    updates[`${PATHS.lineupSubmissions}/${record.scheduleId}/${teamId}/scoreSavedAt`] = now;
-    updates[`${PATHS.lineupSubmissions}/${record.scheduleId}/${teamId}/scoreSavedBy`] = session?.teamId || session?.userId || session?.role || 'unknown';
-    updates[`${PATHS.lineupSubmissions}/${record.scheduleId}/${teamId}/lastUpdatedAt`] = now;
+    updates[`${PATHS.lineupSubmissionDetails}/${record.scheduleId}/${teamId}/convertedToScoreAt`] = now;
+    updates[`${PATHS.lineupSubmissionDetails}/${record.scheduleId}/${teamId}/scoreSavedAt`] = now;
+    updates[`${PATHS.lineupSubmissionDetails}/${record.scheduleId}/${teamId}/scoreSavedBy`] = session?.teamId || session?.userId || session?.role || 'unknown';
+    updates[`${PATHS.lineupSubmissionDetails}/${record.scheduleId}/${teamId}/lastUpdatedAt`] = now;
     updates[`${PATHS.lineupSubmissionMeta}/${record.scheduleId}/${teamId}/convertedToScoreAt`] = now;
     updates[`${PATHS.lineupSubmissionMeta}/${record.scheduleId}/${teamId}/scoreSavedAt`] = now;
     updates[`${PATHS.lineupSubmissionMeta}/${record.scheduleId}/${teamId}/scoreSavedBy`] = session?.teamId || session?.userId || session?.role || 'unknown';
     updates[`${PATHS.lineupSubmissionMeta}/${record.scheduleId}/${teamId}/lastUpdatedAt`] = now;
   });
-  if (Object.keys(updates).length) await update(ref(db), updates);
+  if (Object.keys(updates).length) await updateInChunks(db, updates);
 }
 
 function ScoreLineupLoader({ fixtures, teams, selectedId, onSelectedId, onLoad, mode, suppressEligibilityWarnings = false }) {

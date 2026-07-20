@@ -26,6 +26,36 @@ function firebaseObjectToList(data, source) {
 
 
 
+function compactLineupSubmission(submission) {
+  if (!submission) return null;
+  const {
+    previousVersions,
+    selected,
+    lineup,
+    validationErrors,
+    ...rest
+  } = submission;
+  return {
+    ...rest,
+    selected: Array.isArray(selected) ? selected : [],
+    lineup: Array.isArray(lineup) ? lineup : [],
+    validationErrors: Array.isArray(validationErrors) ? validationErrors.slice(0, 10) : []
+  };
+}
+
+function compactLineupSubmissions(submissions) {
+  return Object.fromEntries(Object.entries(submissions || {}).map(([teamId, submission]) => [teamId, compactLineupSubmission(submission)]));
+}
+
+function compactReveal(reveal) {
+  if (!reveal) return null;
+  const { lineups, ...rest } = reveal;
+  return {
+    ...rest,
+    lineups: Object.fromEntries(Object.entries(lineups || {}).map(([teamId, lines]) => [teamId, Array.isArray(lines) ? lines : []]))
+  };
+}
+
 function applyNameRenamesToMatch(match, team, payload, playerRenameMap) {
   let changed = false;
   const next = { ...(match || {}) };
@@ -452,23 +482,23 @@ function AdminLineupManager({ teams, schedule, lineupSubmissions, revealedLineup
     const now = Date.now();
     const unlockId = `${fixture.id}-${teamId}-${now}`;
     const updates = {
-      [`${PATHS.lineupSubmissions}/${fixture.id}/${teamId}/unlockedAt`]: now,
-      [`${PATHS.lineupSubmissions}/${fixture.id}/${teamId}/unlockedBy`]: session?.userId || session?.name || 'SUPER_ADMIN',
-      [`${PATHS.lineupSubmissions}/${fixture.id}/${teamId}/unlockReason`]: reason.trim(),
-      [`${PATHS.lineupSubmissions}/${fixture.id}/${teamId}/submissionStatus`]: 'unlocked',
-      [`${PATHS.lineupSubmissions}/${fixture.id}/${teamId}/lastUpdatedAt`]: now,
+      [`${PATHS.lineupSubmissionDetails}/${fixture.id}/${teamId}/unlockedAt`]: now,
+      [`${PATHS.lineupSubmissionDetails}/${fixture.id}/${teamId}/unlockedBy`]: session?.userId || session?.name || 'SUPER_ADMIN',
+      [`${PATHS.lineupSubmissionDetails}/${fixture.id}/${teamId}/unlockReason`]: reason.trim(),
+      [`${PATHS.lineupSubmissionDetails}/${fixture.id}/${teamId}/submissionStatus`]: 'unlocked',
+      [`${PATHS.lineupSubmissionDetails}/${fixture.id}/${teamId}/lastUpdatedAt`]: now,
       [`${PATHS.lineupSubmissionMeta}/${fixture.id}/${teamId}/unlockedAt`]: now,
       [`${PATHS.lineupSubmissionMeta}/${fixture.id}/${teamId}/unlockedBy`]: session?.userId || session?.name || 'SUPER_ADMIN',
       [`${PATHS.lineupSubmissionMeta}/${fixture.id}/${teamId}/unlockReason`]: reason.trim(),
       [`${PATHS.lineupSubmissionMeta}/${fixture.id}/${teamId}/submissionStatus`]: 'unlocked',
       [`${PATHS.lineupSubmissionMeta}/${fixture.id}/${teamId}/lastUpdatedAt`]: now,
-      [`${PATHS.lineupSubmissions}/${fixture.id}/${teamId}/previousVersions/${submission?.version || 1}`]: { ...submission, archivedAt: now },
+      [`${PATHS.lineupSubmissionDetails}/${fixture.id}/${teamId}/previousVersions/${submission?.version || 1}`]: { ...compactLineupSubmission(submission), archivedAt: now },
       [`${PATHS.lineupUnlocks}/${unlockId}`]: { scheduleId: fixture.id, teamId, unlockedAt: now, unlockedBy: session?.userId || session?.name || 'SUPER_ADMIN', reason: reason.trim(), previousVersion: submission?.version || 1 }
     };
     try {
       setBusyKey(`${fixture.id}-${teamId}`);
       await update(ref(db), updates);
-      await recordLineupAudit({ actionType: 'Lineup Returned to Captain', session, scheduleId: fixture.id, teamId, oldValue: submission, metadata: { ...updates[`${PATHS.lineupUnlocks}/${unlockId}`], lastUpdatedAt: now } });
+      await recordLineupAudit({ actionType: 'Lineup Returned to Captain', session, scheduleId: fixture.id, teamId, oldValue: compactLineupSubmission(submission), metadata: { ...updates[`${PATHS.lineupUnlocks}/${unlockId}`], lastUpdatedAt: now } });
     } finally {
       setBusyKey('');
     }
@@ -485,19 +515,19 @@ function AdminLineupManager({ teams, schedule, lineupSubmissions, revealedLineup
       deletedAt: now,
       deletedBy: session?.userId || session?.name || 'SUPER_ADMIN',
       reason: reason.trim(),
-      previousSubmissions: submissions || {},
-      previousReveal: reveal || null
+      previousSubmissions: compactLineupSubmissions(submissions),
+      previousReveal: compactReveal(reveal)
     };
     const updates = {
       [`${PATHS.lineupDeletes}/${deleteId}`]: deleteRecord,
-      [`${PATHS.lineupSubmissions}/${fixture.id}`]: null,
+      [`${PATHS.lineupSubmissionDetails}/${fixture.id}`]: null,
       [`${PATHS.lineupSubmissionMeta}/${fixture.id}`]: null
     };
     if (reveal?.revealId) updates[`${PATHS.revealedLineups}/${reveal.revealId}`] = null;
     try {
       setBusyKey(`${fixture.id}-delete`);
       await update(ref(db), updates);
-      await recordLineupAudit({ actionType: 'Lineup References Deleted', session, scheduleId: fixture.id, teamId: 'all', oldValue: { submissions, reveal }, metadata: { ...deleteRecord, lastUpdatedAt: now } });
+      await recordLineupAudit({ actionType: 'Lineup References Deleted', session, scheduleId: fixture.id, teamId: 'all', oldValue: { submissions: compactLineupSubmissions(submissions), reveal: compactReveal(reveal) }, metadata: { ...deleteRecord, lastUpdatedAt: now } });
     } finally {
       setBusyKey('');
     }

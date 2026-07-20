@@ -1,4 +1,4 @@
-import { get, push, ref, update } from 'firebase/database';
+import { get, push, ref } from 'firebase/database';
 import { db, PATHS } from '../firebase';
 import { buildPtlRatings } from '../utils/ptlRating';
 import { resolveMatchTeams, matchWinnerId, lineWinnerSide } from '../utils/matchTeams';
@@ -6,6 +6,7 @@ import { DEFAULT_ELIGIBILITY_RULES, normalizeEligibilityRules } from '../utils/e
 import { approvedMatches, isApprovedMatch } from '../utils/matchStatus';
 import { validateLineScore } from '../utils/tennisScoreRules';
 import { isAdminRole } from '../utils/roles';
+import { updateInChunks } from '../utils/firebaseWrites';
 
 const keyFor = (value) => String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'unknown';
 const listFrom = (val) => Object.entries(val || {}).map(([id, value]) => ({ id, ...(value || {}) }));
@@ -234,14 +235,14 @@ export class ScoreProcessingService {
     const matchUpdates = matchId ? (writeMatchRecord
       ? { [`${PATHS.matches}/${matchId}`]: { ...matchRecord, ...meta, processedAt: now, scoreEnteredBy: matchRecord?.enteredBy || updatedBy, approvedBy: matchRecord?.approvedBy || session?.role || updatedBy } }
       : { [`${PATHS.matches}/${matchId}/processedAt`]: now, [`${PATHS.matches}/${matchId}/updatedAt`]: now, [`${PATHS.matches}/${matchId}/updatedBy`]: updatedBy, [`${PATHS.matches}/${matchId}/version`]: now }) : {};
-    await update(ref(db), {
-      [PATHS.standings]: Object.fromEntries(standings.map(r => [r.teamId, { ...r, ...meta }])),
-      [PATHS.pprcRatings]: Object.fromEntries(pprcRatings.map(r => [keyFor(r.name), { ...r, ...meta }])),
-      [PATHS.playerHistory]: Object.fromEntries(Object.entries(histories.playerHistory).map(([k, v]) => [k, { ...v, ...meta }])),
-      [PATHS.teamHistory]: Object.fromEntries(Object.entries(histories.teamHistory).map(([k, v]) => [k, { ...v, ...meta }])),
-      [PATHS.playerMatchups]: Object.fromEntries(Object.entries(histories.playerMatchups).map(([k, v]) => [k, { ...v, ...meta }])),
-      [PATHS.teamMatchups]: Object.fromEntries(Object.entries(histories.teamMatchups).map(([k, v]) => [k, { ...v, ...meta }])),
-      [PATHS.playerEligibility]: Object.fromEntries(Object.entries(playerEligibility).map(([k, v]) => [k, { ...v, ...meta }])),
+    await updateInChunks(db, {
+      ...Object.fromEntries(standings.map(r => [`${PATHS.standings}/${r.teamId}`, { ...r, ...meta }])),
+      ...Object.fromEntries(pprcRatings.map(r => [`${PATHS.pprcRatings}/${keyFor(r.name)}`, { ...r, ...meta }])),
+      ...Object.fromEntries(Object.entries(histories.playerHistory).map(([k, v]) => [`${PATHS.playerHistory}/${k}`, { ...v, ...meta }])),
+      ...Object.fromEntries(Object.entries(histories.teamHistory).map(([k, v]) => [`${PATHS.teamHistory}/${k}`, { ...v, ...meta }])),
+      ...Object.fromEntries(Object.entries(histories.playerMatchups).map(([k, v]) => [`${PATHS.playerMatchups}/${k}`, { ...v, ...meta }])),
+      ...Object.fromEntries(Object.entries(histories.teamMatchups).map(([k, v]) => [`${PATHS.teamMatchups}/${k}`, { ...v, ...meta }])),
+      ...Object.fromEntries(Object.entries(playerEligibility).map(([k, v]) => [`${PATHS.playerEligibility}/${k}`, { ...v, ...meta }])),
       [PATHS.cachedSummaries]: { updatedAt: now, updatedBy, version: now, matchCount: approved.length },
       ...matchUpdates
     });

@@ -64,10 +64,10 @@ async function writeSystemLineupAudit(root, { actionType, scheduleId, teamId, me
 async function markInvalidSubmission(root, scheduleId, teamId, errors) {
   const now = Date.now();
   const updates = {
-    [`lineupSubmissions/${scheduleId}/${teamId}/submissionStatus`]: 'validation_failed',
-    [`lineupSubmissions/${scheduleId}/${teamId}/validationErrors`]: errors,
-    [`lineupSubmissions/${scheduleId}/${teamId}/lockedAt`]: null,
-    [`lineupSubmissions/${scheduleId}/${teamId}/lastUpdatedAt`]: now,
+    [`lineupSubmissionDetails/${scheduleId}/${teamId}/submissionStatus`]: 'validation_failed',
+    [`lineupSubmissionDetails/${scheduleId}/${teamId}/validationErrors`]: errors,
+    [`lineupSubmissionDetails/${scheduleId}/${teamId}/lockedAt`]: null,
+    [`lineupSubmissionDetails/${scheduleId}/${teamId}/lastUpdatedAt`]: now,
     [`lineupSubmissionMeta/${scheduleId}/${teamId}/submissionStatus`]: 'validation_failed',
     [`lineupSubmissionMeta/${scheduleId}/${teamId}/validationErrors`]: errors,
     [`lineupSubmissionMeta/${scheduleId}/${teamId}/lockedAt`]: null,
@@ -77,24 +77,22 @@ async function markInvalidSubmission(root, scheduleId, teamId, errors) {
   await writeSystemLineupAudit(root, { actionType: 'Lineup Validation Failed', scheduleId, teamId, metadata: { validationErrors: errors, lastUpdatedAt: now } });
 }
 
-// Trigger on the `lockedAt` leaf (a single timestamp) rather than the whole
-// submission node. Realtime Database caps a Cloud Function's event payload at
-// 1 MB and rejects the client write itself — before the function runs — whenever
-// the resulting trigger event (before + after snapshot at the watched path) would
-// exceed that limit. Watching the full node made captains' lineup writes fail with
-// `TRIGGER_PAYLOAD_TOO_LARGE` once a submission node grew large. Scoping the
-// trigger to a scalar keeps the event tiny so writes always succeed, and it also
-// stops the reveal writes below (revealedAt/revealId/status) from re-triggering
-// this function. `lockedAt` changes exactly when reveal logic needs to run.
+// Trigger on the metadata `lockedAt` leaf (a single timestamp) instead of the
+// full lineup submission. Realtime Database caps a Cloud Function event payload
+// at 1 MB and rejects the client write before the function runs whenever the
+// trigger snapshot would exceed that limit. Full lineup details now live under
+// `lineupSubmissionDetails`, while this scalar metadata trigger stays tiny and
+// avoids the legacy `lineupSubmissions` hot path that caused
+// `TRIGGER_PAYLOAD_TOO_LARGE` during captain lineup and score-marker writes.
 exports.revealLineupsOnLock = functions.database
-  .ref(`/${SEASON_ROOT}/lineupSubmissions/{scheduleId}/{teamId}/lockedAt`)
+  .ref(`/${SEASON_ROOT}/lineupSubmissionMeta/{scheduleId}/{teamId}/lockedAt`)
   .onWrite(async (change, context) => {
     const { scheduleId, teamId } = context.params;
     const root = admin.database().ref(SEASON_ROOT);
 
     // Read the full submission server-side; the trigger event only carries the
     // lockedAt timestamp, and a server read has no payload-size limit.
-    const submissionSnap = await root.child(`lineupSubmissions/${scheduleId}/${teamId}`).get();
+    const submissionSnap = await root.child(`lineupSubmissionDetails/${scheduleId}/${teamId}`).get();
     const after = submissionSnap.val();
 
     if (!after) {
@@ -138,7 +136,7 @@ exports.revealLineupsOnLock = functions.database
       return null;
     }
 
-    const submissionsSnap = await root.child(`lineupSubmissions/${scheduleId}`).get();
+    const submissionsSnap = await root.child(`lineupSubmissionDetails/${scheduleId}`).get();
     const submissions = submissionsSnap.val() || {};
     const team1Submission = submissions[fixture.team1Id];
     const team2Submission = submissions[fixture.team2Id];
@@ -174,14 +172,14 @@ exports.revealLineupsOnLock = functions.database
 
     const updates = {
       [`revealedLineups/${revealId}`]: revealRecord,
-      [`lineupSubmissions/${scheduleId}/${fixture.team1Id}/revealedAt`]: now,
-      [`lineupSubmissions/${scheduleId}/${fixture.team1Id}/revealId`]: revealId,
-      [`lineupSubmissions/${scheduleId}/${fixture.team1Id}/submissionStatus`]: 'revealed',
-      [`lineupSubmissions/${scheduleId}/${fixture.team1Id}/lastUpdatedAt`]: now,
-      [`lineupSubmissions/${scheduleId}/${fixture.team2Id}/revealedAt`]: now,
-      [`lineupSubmissions/${scheduleId}/${fixture.team2Id}/revealId`]: revealId,
-      [`lineupSubmissions/${scheduleId}/${fixture.team2Id}/submissionStatus`]: 'revealed',
-      [`lineupSubmissions/${scheduleId}/${fixture.team2Id}/lastUpdatedAt`]: now,
+      [`lineupSubmissionDetails/${scheduleId}/${fixture.team1Id}/revealedAt`]: now,
+      [`lineupSubmissionDetails/${scheduleId}/${fixture.team1Id}/revealId`]: revealId,
+      [`lineupSubmissionDetails/${scheduleId}/${fixture.team1Id}/submissionStatus`]: 'revealed',
+      [`lineupSubmissionDetails/${scheduleId}/${fixture.team1Id}/lastUpdatedAt`]: now,
+      [`lineupSubmissionDetails/${scheduleId}/${fixture.team2Id}/revealedAt`]: now,
+      [`lineupSubmissionDetails/${scheduleId}/${fixture.team2Id}/revealId`]: revealId,
+      [`lineupSubmissionDetails/${scheduleId}/${fixture.team2Id}/submissionStatus`]: 'revealed',
+      [`lineupSubmissionDetails/${scheduleId}/${fixture.team2Id}/lastUpdatedAt`]: now,
       [`lineupSubmissionMeta/${scheduleId}/${fixture.team1Id}/revealedAt`]: now,
       [`lineupSubmissionMeta/${scheduleId}/${fixture.team1Id}/revealId`]: revealId,
       [`lineupSubmissionMeta/${scheduleId}/${fixture.team1Id}/submissionStatus`]: 'revealed',

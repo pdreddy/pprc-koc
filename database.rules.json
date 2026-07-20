@@ -33,6 +33,15 @@
           }
         }
       },
+      "lineupSubmissionDetails": {
+        "$scheduleId": {
+          ".read": "auth != null",
+          "$teamId": {
+            ".read": "auth != null",
+            ".write": "auth != null"
+          }
+        }
+      },
       "lineupSubmissions": {
         "$scheduleId": {
           ".read": "auth != null",

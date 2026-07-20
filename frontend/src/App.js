@@ -15,6 +15,7 @@ import { DEFAULT_ELIGIBILITY_RULES, normalizeEligibilityRules } from './utils/el
 import BottomNav from './components/BottomNav';
 import AppHeader from './components/Header';
 import { writeAuditLog } from './services/AuditService';
+import { updateInChunks } from './utils/firebaseWrites';
 
 const pageImports = {
   Home:      () => import('./pages/Home'),
@@ -229,7 +230,7 @@ function Shell() {
         if (!rSnap.exists()) {
           await set(ref(db, PATHS.playerRatings), { ...buildUtrRatingsTable(), ...buildAuctionPlayerRatingsTable() });
         } else {
-          await update(ref(db, PATHS.playerRatings), auctionPlayerRatingUpdates());
+          await updateInChunks(db, Object.fromEntries(Object.entries(auctionPlayerRatingUpdates()).map(([key, value]) => [`${PATHS.playerRatings}/${key}`, value])));
         }
 
         // Schedule — seed if missing or stale

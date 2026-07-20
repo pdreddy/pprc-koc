@@ -13,6 +13,7 @@ import { parseQuickScore } from '../utils/quickScoreParser';
 import { regularSetWinner, validateLineScore } from '../utils/tennisScoreRules';
 import { clearLineupScoreMarkers } from '../utils/lineupScoreMarkers';
 import { archiveScoreSnapshot } from '../utils/scoreArchive';
+import { updateInChunks } from '../utils/firebaseWrites';
 import TeamLogo from '../components/TeamLogo';
 import { WhatsAppShareButton } from '../components/WhatsAppIcon';
 
@@ -1057,7 +1058,7 @@ async function markLineupConvertedToScore(record, session) {
     updates[`${PATHS.lineupSubmissionMeta}/${record.scheduleId}/${teamId}/scoreSavedBy`] = session?.teamId || session?.userId || session?.role || 'unknown';
     updates[`${PATHS.lineupSubmissionMeta}/${record.scheduleId}/${teamId}/lastUpdatedAt`] = now;
   });
-  if (Object.keys(updates).length) await update(ref(db), updates);
+  if (Object.keys(updates).length) await updateInChunks(db, updates);
 }
 
 function ScoreLineupLoader({ fixtures, teams, selectedId, onSelectedId, onLoad, mode, suppressEligibilityWarnings = false }) {

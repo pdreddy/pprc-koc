@@ -16,6 +16,16 @@ import BottomNav from './components/BottomNav';
 import AppHeader from './components/Header';
 import { writeAuditLog } from './services/AuditService';
 
+function isLockedLineupSubmission(submission) {
+  return !!submission && !submission.unlockedAt && (
+    !!submission.lockedAt ||
+    !!submission.submittedAt ||
+    !!submission.revealedAt ||
+    !!submission.revealId ||
+    submission.submissionStatus === 'submitted_locked'
+  );
+}
+
 const pageImports = {
   Home:      () => import('./pages/Home'),
   Teams:     () => import('./pages/Teams'),
@@ -319,7 +329,7 @@ function Shell() {
   useEffect(() => {
     const revealedIds = Object.values(revealedLineups || {}).map(row => row?.scheduleId).filter(Boolean);
     const lockedIds = Object.entries(lineupSubmissionMeta || {})
-      .filter(([, submissions]) => Object.values(submissions || {}).filter(submission => submission?.lockedAt || submission?.revealedAt || submission?.revealId).length >= 2)
+      .filter(([, submissions]) => Object.values(submissions || {}).filter(isLockedLineupSubmission).length >= 2)
       .map(([scheduleId]) => scheduleId);
     const scheduleIds = Array.from(new Set([...revealedIds, ...lockedIds]));
     if (!scheduleIds.length) {

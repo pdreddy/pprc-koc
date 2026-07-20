@@ -8,7 +8,8 @@ jest.mock('../firebase', () => ({
   }
 }));
 
-import { buildLineupCourts, courtsFromMatch, isLockedLineupSubmission, scoreLineupFixtures, validateEligibilityForLines } from './ScoreEntry';
+import { buildLineupCourts, courtsFromMatch, scoreLineupFixtures, validateEligibilityForLines } from './ScoreEntry';
+import { isLockedLineupSubmission } from '../utils/lineupSubmissionStatus';
 import { buildLineupScoreClearUpdates } from '../utils/lineupScoreMarkers';
 import { buildScoreArchiveUpdates } from '../utils/scoreArchive';
 

@@ -4,6 +4,7 @@ import { matchTeamNames, matchWinnerId } from '../utils/matchTeams';
 import { useAuth } from '../contexts/AuthContext';
 import { ROLES, hasRole } from '../utils/roles';
 import TeamLogo from '../components/TeamLogo';
+import { isLockedLineupSubmission } from '../utils/lineupSubmissionStatus';
 
 function formatDate(iso) {
   if (!iso) return '';
@@ -37,16 +38,6 @@ function formatSetScore(set) {
   if (set.tieBreak) score += `(${set.tieBreak.team1}-${set.tieBreak.team2})`;
   if (set.matchTieBreak) score += `(${set.matchTieBreak.team1}-${set.matchTieBreak.team2})`;
   return score;
-}
-
-function isLockedLineupSubmission(submission) {
-  return !!submission && !submission.unlockedAt && (
-    !!submission.lockedAt ||
-    !!submission.submittedAt ||
-    !!submission.revealedAt ||
-    !!submission.revealId ||
-    submission.submissionStatus === 'submitted_locked'
-  );
 }
 
 function lineupForTeam(teamId, submissions, reveal) {

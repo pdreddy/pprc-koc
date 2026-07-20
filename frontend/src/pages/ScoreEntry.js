@@ -12,6 +12,7 @@ import { DEFAULT_ELIGIBILITY_RULES, normalizeEligibilityRules } from '../utils/e
 import { parseQuickScore } from '../utils/quickScoreParser';
 import { regularSetWinner, validateLineScore } from '../utils/tennisScoreRules';
 import { clearLineupScoreMarkers } from '../utils/lineupScoreMarkers';
+import { isLockedLineupSubmission } from '../utils/lineupSubmissionStatus';
 import { archiveScoreSnapshot } from '../utils/scoreArchive';
 import TeamLogo from '../components/TeamLogo';
 import { WhatsAppShareButton } from '../components/WhatsAppIcon';
@@ -999,16 +1000,6 @@ function lineupFixtureMatchesTarget(row, targetScheduleId = '', targetRevealId =
   if (!row) return false;
   return (!!targetScheduleId && String(row.item?.id || '') === String(targetScheduleId))
     || (!!targetRevealId && [row.revealId, row.revealCode].filter(Boolean).map(String).includes(String(targetRevealId)));
-}
-
-export function isLockedLineupSubmission(submission) {
-  return !!submission && !submission.unlockedAt && (
-    !!submission.lockedAt ||
-    !!submission.submittedAt ||
-    !!submission.revealedAt ||
-    !!submission.revealId ||
-    submission.submissionStatus === 'submitted_locked'
-  );
 }
 
 export function scoreLineupFixtures(schedule, revealedLineups, lineupSubmissions, team1Id, team2Id, teams, matches, eligibilityRules, exclude = {}) {

@@ -11,6 +11,7 @@ import { resolveMatchTeams, lineWinnerSide } from '../utils/matchTeams';
 import { CaptainCapacityCard, buildCaptainCapacityRows } from '../components/CaptainCapacity';
 import TeamLogo from '../components/TeamLogo';
 import { WhatsAppShareButton } from '../components/WhatsAppIcon';
+import { isLockedLineupSubmission } from '../utils/lineupSubmissionStatus';
 
 function formatDate(iso) {
   if (!iso) return 'TBD';

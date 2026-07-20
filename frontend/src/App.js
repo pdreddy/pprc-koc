@@ -15,16 +15,7 @@ import { DEFAULT_ELIGIBILITY_RULES, normalizeEligibilityRules } from './utils/el
 import BottomNav from './components/BottomNav';
 import AppHeader from './components/Header';
 import { writeAuditLog } from './services/AuditService';
-
-function isLockedLineupSubmission(submission) {
-  return !!submission && !submission.unlockedAt && (
-    !!submission.lockedAt ||
-    !!submission.submittedAt ||
-    !!submission.revealedAt ||
-    !!submission.revealId ||
-    submission.submissionStatus === 'submitted_locked'
-  );
-}
+import { isLockedLineupSubmission } from './utils/lineupSubmissionStatus';
 
 const pageImports = {
   Home:      () => import('./pages/Home'),

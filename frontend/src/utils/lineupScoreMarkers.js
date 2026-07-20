@@ -6,10 +6,10 @@ export function buildLineupScoreClearUpdates(record, now = Date.now()) {
   if (!scheduleId) return {};
   const updates = {};
   [record.t1Id, record.t2Id].filter(Boolean).forEach(teamId => {
-    updates[`${PATHS.lineupSubmissions}/${scheduleId}/${teamId}/scoreSavedAt`] = null;
-    updates[`${PATHS.lineupSubmissions}/${scheduleId}/${teamId}/scoreSavedBy`] = null;
-    updates[`${PATHS.lineupSubmissions}/${scheduleId}/${teamId}/convertedToScoreAt`] = null;
-    updates[`${PATHS.lineupSubmissions}/${scheduleId}/${teamId}/lastUpdatedAt`] = now;
+    updates[`${PATHS.lineupSubmissionDetails}/${scheduleId}/${teamId}/scoreSavedAt`] = null;
+    updates[`${PATHS.lineupSubmissionDetails}/${scheduleId}/${teamId}/scoreSavedBy`] = null;
+    updates[`${PATHS.lineupSubmissionDetails}/${scheduleId}/${teamId}/convertedToScoreAt`] = null;
+    updates[`${PATHS.lineupSubmissionDetails}/${scheduleId}/${teamId}/lastUpdatedAt`] = now;
     updates[`${PATHS.lineupSubmissionMeta}/${scheduleId}/${teamId}/scoreSavedAt`] = null;
     updates[`${PATHS.lineupSubmissionMeta}/${scheduleId}/${teamId}/scoreSavedBy`] = null;
     updates[`${PATHS.lineupSubmissionMeta}/${scheduleId}/${teamId}/convertedToScoreAt`] = null;

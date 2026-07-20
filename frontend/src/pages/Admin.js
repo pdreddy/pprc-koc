@@ -482,17 +482,17 @@ function AdminLineupManager({ teams, schedule, lineupSubmissions, revealedLineup
     const now = Date.now();
     const unlockId = `${fixture.id}-${teamId}-${now}`;
     const updates = {
-      [`${PATHS.lineupSubmissions}/${fixture.id}/${teamId}/unlockedAt`]: now,
-      [`${PATHS.lineupSubmissions}/${fixture.id}/${teamId}/unlockedBy`]: session?.userId || session?.name || 'SUPER_ADMIN',
-      [`${PATHS.lineupSubmissions}/${fixture.id}/${teamId}/unlockReason`]: reason.trim(),
-      [`${PATHS.lineupSubmissions}/${fixture.id}/${teamId}/submissionStatus`]: 'unlocked',
-      [`${PATHS.lineupSubmissions}/${fixture.id}/${teamId}/lastUpdatedAt`]: now,
+      [`${PATHS.lineupSubmissionDetails}/${fixture.id}/${teamId}/unlockedAt`]: now,
+      [`${PATHS.lineupSubmissionDetails}/${fixture.id}/${teamId}/unlockedBy`]: session?.userId || session?.name || 'SUPER_ADMIN',
+      [`${PATHS.lineupSubmissionDetails}/${fixture.id}/${teamId}/unlockReason`]: reason.trim(),
+      [`${PATHS.lineupSubmissionDetails}/${fixture.id}/${teamId}/submissionStatus`]: 'unlocked',
+      [`${PATHS.lineupSubmissionDetails}/${fixture.id}/${teamId}/lastUpdatedAt`]: now,
       [`${PATHS.lineupSubmissionMeta}/${fixture.id}/${teamId}/unlockedAt`]: now,
       [`${PATHS.lineupSubmissionMeta}/${fixture.id}/${teamId}/unlockedBy`]: session?.userId || session?.name || 'SUPER_ADMIN',
       [`${PATHS.lineupSubmissionMeta}/${fixture.id}/${teamId}/unlockReason`]: reason.trim(),
       [`${PATHS.lineupSubmissionMeta}/${fixture.id}/${teamId}/submissionStatus`]: 'unlocked',
       [`${PATHS.lineupSubmissionMeta}/${fixture.id}/${teamId}/lastUpdatedAt`]: now,
-      [`${PATHS.lineupSubmissions}/${fixture.id}/${teamId}/previousVersions/${submission?.version || 1}`]: { ...compactLineupSubmission(submission), archivedAt: now },
+      [`${PATHS.lineupSubmissionDetails}/${fixture.id}/${teamId}/previousVersions/${submission?.version || 1}`]: { ...compactLineupSubmission(submission), archivedAt: now },
       [`${PATHS.lineupUnlocks}/${unlockId}`]: { scheduleId: fixture.id, teamId, unlockedAt: now, unlockedBy: session?.userId || session?.name || 'SUPER_ADMIN', reason: reason.trim(), previousVersion: submission?.version || 1 }
     };
     try {
@@ -520,7 +520,7 @@ function AdminLineupManager({ teams, schedule, lineupSubmissions, revealedLineup
     };
     const updates = {
       [`${PATHS.lineupDeletes}/${deleteId}`]: deleteRecord,
-      [`${PATHS.lineupSubmissions}/${fixture.id}`]: null,
+      [`${PATHS.lineupSubmissionDetails}/${fixture.id}`]: null,
       [`${PATHS.lineupSubmissionMeta}/${fixture.id}`]: null
     };
     if (reveal?.revealId) updates[`${PATHS.revealedLineups}/${reveal.revealId}`] = null;

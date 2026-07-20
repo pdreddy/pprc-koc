@@ -488,7 +488,7 @@ const CaptainFixtureCard = React.memo(function CaptainFixtureCard({ item, teams,
       revealId: payload.revealId
     };
     const updates = {
-      [`${PATHS.lineupSubmissions}/${item.id}/${captainTeam.id}`]: payload,
+      [`${PATHS.lineupSubmissionDetails}/${item.id}/${captainTeam.id}`]: payload,
       [`${PATHS.lineupSubmissionMeta}/${item.id}/${captainTeam.id}`]: metaPayload
     };
     try {
@@ -539,7 +539,7 @@ const CaptainFixtureCard = React.memo(function CaptainFixtureCard({ item, teams,
     const now = Date.now();
     try {
       await ensureAuth();
-      await update(ref(db), { [`${PATHS.lineupSubmissions}/${item.id}/${captainTeam.id}/whatsappShared`]: true, [`${PATHS.lineupSubmissions}/${item.id}/${captainTeam.id}/whatsappSharedAt`]: now, [`${PATHS.lineupSubmissions}/${item.id}/${captainTeam.id}/lastUpdatedAt`]: now, [`${PATHS.lineupSubmissionMeta}/${item.id}/${captainTeam.id}/whatsappShared`]: true, [`${PATHS.lineupSubmissionMeta}/${item.id}/${captainTeam.id}/whatsappSharedAt`]: now, [`${PATHS.lineupSubmissionMeta}/${item.id}/${captainTeam.id}/lastUpdatedAt`]: now });
+      await update(ref(db), { [`${PATHS.lineupSubmissionDetails}/${item.id}/${captainTeam.id}/whatsappShared`]: true, [`${PATHS.lineupSubmissionDetails}/${item.id}/${captainTeam.id}/whatsappSharedAt`]: now, [`${PATHS.lineupSubmissionDetails}/${item.id}/${captainTeam.id}/lastUpdatedAt`]: now, [`${PATHS.lineupSubmissionMeta}/${item.id}/${captainTeam.id}/whatsappShared`]: true, [`${PATHS.lineupSubmissionMeta}/${item.id}/${captainTeam.id}/whatsappSharedAt`]: now, [`${PATHS.lineupSubmissionMeta}/${item.id}/${captainTeam.id}/lastUpdatedAt`]: now });
       await recordLineupAudit({ actionType: 'Lineup WhatsApp Shared', session, scheduleId: item.id, teamId: captainTeam.id, metadata: { whatsappSharedAt: now, lastUpdatedAt: now } });
     } catch (e) {
       setMessage(`WhatsApp status failed: ${e.message}`);
@@ -739,9 +739,9 @@ function CompletedMatchWhatsappShare({ item, teams, captainTeam, opponent, lineu
       setBusy(true);
       await ensureAuth();
       await update(ref(db), {
-        [`${PATHS.lineupSubmissions}/${item.id}/${captainTeam.id}/whatsappShared`]: true,
-        [`${PATHS.lineupSubmissions}/${item.id}/${captainTeam.id}/whatsappSharedAt`]: now,
-        [`${PATHS.lineupSubmissions}/${item.id}/${captainTeam.id}/lastUpdatedAt`]: now,
+        [`${PATHS.lineupSubmissionDetails}/${item.id}/${captainTeam.id}/whatsappShared`]: true,
+        [`${PATHS.lineupSubmissionDetails}/${item.id}/${captainTeam.id}/whatsappSharedAt`]: now,
+        [`${PATHS.lineupSubmissionDetails}/${item.id}/${captainTeam.id}/lastUpdatedAt`]: now,
         [`${PATHS.lineupSubmissionMeta}/${item.id}/${captainTeam.id}/whatsappShared`]: true,
         [`${PATHS.lineupSubmissionMeta}/${item.id}/${captainTeam.id}/whatsappSharedAt`]: now,
         [`${PATHS.lineupSubmissionMeta}/${item.id}/${captainTeam.id}/lastUpdatedAt`]: now

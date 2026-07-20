@@ -3,6 +3,7 @@ jest.mock('../firebase', () => ({
   ensureAuth: jest.fn(),
   PATHS: {
     lineupSubmissions: 'koc_s3/lineupSubmissions',
+    lineupSubmissionDetails: 'koc_s3/lineupSubmissionDetails',
     lineupSubmissionMeta: 'koc_s3/lineupSubmissionMeta',
     scoreArchive: 'koc_s3/scoreArchive'
   }
@@ -165,11 +166,11 @@ test('buildLineupScoreClearUpdates clears saved score markers for both teams', (
   }, 12345);
 
   expect(updates).toMatchObject({
-    'koc_s3/lineupSubmissions/A-r1-m1/rr/scoreSavedAt': null,
-    'koc_s3/lineupSubmissions/A-r1-m1/rr/scoreSavedBy': null,
-    'koc_s3/lineupSubmissions/A-r1-m1/rr/convertedToScoreAt': null,
-    'koc_s3/lineupSubmissions/A-r1-m1/rr/lastUpdatedAt': 12345,
-    'koc_s3/lineupSubmissions/A-r1-m1/bb/scoreSavedAt': null,
+    'koc_s3/lineupSubmissionDetails/A-r1-m1/rr/scoreSavedAt': null,
+    'koc_s3/lineupSubmissionDetails/A-r1-m1/rr/scoreSavedBy': null,
+    'koc_s3/lineupSubmissionDetails/A-r1-m1/rr/convertedToScoreAt': null,
+    'koc_s3/lineupSubmissionDetails/A-r1-m1/rr/lastUpdatedAt': 12345,
+    'koc_s3/lineupSubmissionDetails/A-r1-m1/bb/scoreSavedAt': null,
     'koc_s3/lineupSubmissionMeta/A-r1-m1/bb/scoreSavedAt': null,
     'koc_s3/lineupSubmissionMeta/A-r1-m1/bb/scoreSavedBy': null,
     'koc_s3/lineupSubmissionMeta/A-r1-m1/bb/convertedToScoreAt': null,

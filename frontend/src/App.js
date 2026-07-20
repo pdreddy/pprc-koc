@@ -328,7 +328,7 @@ function Shell() {
       return undefined;
     }
     setRevealedScheduleSubmissions(prev => Object.fromEntries(Object.entries(prev || {}).filter(([scheduleId]) => scheduleIds.includes(scheduleId))));
-    const unsubs = scheduleIds.map(scheduleId => onValue(ref(db, `${PATHS.lineupSubmissions}/${scheduleId}`), (snap) => {
+    const unsubs = scheduleIds.map(scheduleId => onValue(ref(db, `${PATHS.lineupSubmissionDetails}/${scheduleId}`), (snap) => {
       setRevealedScheduleSubmissions(prev => ({ ...prev, [scheduleId]: snap.val() || null }));
       touchLastRefreshed();
     }, () => {
@@ -347,7 +347,7 @@ function Shell() {
       setOwnLineupSubmissions({});
       return undefined;
     }
-    const unsubs = scheduleIds.map(scheduleId => onValue(ref(db, `${PATHS.lineupSubmissions}/${scheduleId}/${session.teamId}`), (snap) => {
+    const unsubs = scheduleIds.map(scheduleId => onValue(ref(db, `${PATHS.lineupSubmissionDetails}/${scheduleId}/${session.teamId}`), (snap) => {
       setOwnLineupSubmissions(prev => ({ ...prev, [scheduleId]: snap.val() || null }));
       touchLastRefreshed();
     }));

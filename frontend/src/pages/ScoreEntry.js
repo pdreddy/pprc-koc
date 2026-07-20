@@ -1049,10 +1049,10 @@ async function markLineupConvertedToScore(record, session) {
   const now = Date.now();
   const updates = {};
   [record.t1Id, record.t2Id].filter(Boolean).forEach(teamId => {
-    updates[`${PATHS.lineupSubmissions}/${record.scheduleId}/${teamId}/convertedToScoreAt`] = now;
-    updates[`${PATHS.lineupSubmissions}/${record.scheduleId}/${teamId}/scoreSavedAt`] = now;
-    updates[`${PATHS.lineupSubmissions}/${record.scheduleId}/${teamId}/scoreSavedBy`] = session?.teamId || session?.userId || session?.role || 'unknown';
-    updates[`${PATHS.lineupSubmissions}/${record.scheduleId}/${teamId}/lastUpdatedAt`] = now;
+    updates[`${PATHS.lineupSubmissionDetails}/${record.scheduleId}/${teamId}/convertedToScoreAt`] = now;
+    updates[`${PATHS.lineupSubmissionDetails}/${record.scheduleId}/${teamId}/scoreSavedAt`] = now;
+    updates[`${PATHS.lineupSubmissionDetails}/${record.scheduleId}/${teamId}/scoreSavedBy`] = session?.teamId || session?.userId || session?.role || 'unknown';
+    updates[`${PATHS.lineupSubmissionDetails}/${record.scheduleId}/${teamId}/lastUpdatedAt`] = now;
     updates[`${PATHS.lineupSubmissionMeta}/${record.scheduleId}/${teamId}/convertedToScoreAt`] = now;
     updates[`${PATHS.lineupSubmissionMeta}/${record.scheduleId}/${teamId}/scoreSavedAt`] = now;
     updates[`${PATHS.lineupSubmissionMeta}/${record.scheduleId}/${teamId}/scoreSavedBy`] = session?.teamId || session?.userId || session?.role || 'unknown';

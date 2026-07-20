@@ -47,8 +47,13 @@ export async function writeAuditLog({ actionType, session, targetType, targetId,
     device: /Mobi|Android|iPhone|iPad/i.test(ua) ? 'mobile' : 'desktop',
     browser: ua.slice(0, 240)
   };
-  await push(ref(db, PATHS.auditLogs), record);
-  return record;
+  try {
+    await push(ref(db, PATHS.auditLogs), record);
+    return { ...record, auditWriteStatus: 'written' };
+  } catch (error) {
+    console.warn('Audit log write skipped:', error?.message || error);
+    return { ...record, auditWriteStatus: 'skipped', auditWriteError: error?.code || error?.message || 'unknown' };
+  }
 }
 
 

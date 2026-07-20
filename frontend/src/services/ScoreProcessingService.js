@@ -5,6 +5,7 @@ import { resolveMatchTeams, matchWinnerId, lineWinnerSide } from '../utils/match
 import { DEFAULT_ELIGIBILITY_RULES, normalizeEligibilityRules } from '../utils/eligibilityRules';
 import { approvedMatches, isApprovedMatch } from '../utils/matchStatus';
 import { validateLineScore } from '../utils/tennisScoreRules';
+import { isAdminRole } from '../utils/roles';
 
 const keyFor = (value) => String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'unknown';
 const listFrom = (val) => Object.entries(val || {}).map(([id, value]) => ({ id, ...(value || {}) }));
@@ -106,12 +107,16 @@ function computeHistories(teams, matches) {
 }
 
 
+function eligibilityNameKey(playerName) {
+  return String(playerName || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
 function eligibilityKey(teamId, playerName) {
-  return `${teamId}:${String(playerName || '').trim().toLowerCase()}`.replace(/[^a-z0-9:]+/g, '_');
+  return `${teamId}:${eligibilityNameKey(playerName)}`;
 }
 
 function eligibilityPairKey(teamId, names) {
-  return `${teamId}:${names.map(name => String(name || '').trim().toLowerCase()).sort().join('|')}`;
+  return `${teamId}:${names.map(eligibilityNameKey).sort().join('|')}`;
 }
 
 function computePlayerEligibility(teams, matches) {
@@ -153,7 +158,7 @@ function computePlayerEligibility(teams, matches) {
       const row = rows[day.key] || { playerId: day.key, playerName: day.name, teamId: day.teamId, seasonId: 'koc_s3', totalMatchDays: 0, singlesDays: 0, doublesDays: 0, partnerHistory: {} };
       if (day.singles) row.singlesDays += 1;
       if (day.doubles) row.doublesDays += 1;
-      row.totalMatchDays = row.singlesDays + row.doublesDays;
+      row.totalMatchDays += 1;
       rows[day.key] = row;
     });
   });
@@ -161,7 +166,7 @@ function computePlayerEligibility(teams, matches) {
 }
 
 
-function assertEligibilityRules(teams, matches, eligibilityRules = DEFAULT_ELIGIBILITY_RULES) {
+function assertEligibilityRules(teams, matches, eligibilityRules = DEFAULT_ELIGIBILITY_RULES, { enforce = true } = {}) {
   const rules = normalizeEligibilityRules(eligibilityRules);
   const rows = computePlayerEligibility(teams, matches);
   const errors = [];
@@ -192,7 +197,11 @@ function assertEligibilityRules(teams, matches, eligibilityRules = DEFAULT_ELIGI
       if (row.doublesCount > 0 && row.doublesCount !== 2) errors.push(`${row.name}: doubles players must play both Doubles and Reverse Doubles`);
     });
   });
-  if (errors.length > 0) throw new Error(`Player eligibility validation failed:\n${Array.from(new Set(errors)).join('\n')}`);
+  if (errors.length > 0) {
+    const message = `Player eligibility validation failed:\n${Array.from(new Set(errors)).join('\n')}`;
+    if (enforce) throw new Error(message);
+    console.warn('Admin score processing eligibility warnings skipped:', message);
+  }
   return rows;
 }
 
@@ -210,11 +219,16 @@ export class ScoreProcessingService {
     const teams = teamsSnap.val() || {};
     let matches = listFrom(matchesSnap.val());
     const current = matchRecord || matches.find(m => m.id === matchId);
-    if (matchRecord && matchId && !matches.some(m => m.id === matchId)) matches = [...matches, { ...matchRecord, id: matchId }];
+    if (matchRecord && matchId) {
+      const normalizedRecord = { ...matchRecord, id: matchId };
+      matches = matches.some(m => m.id === matchId)
+        ? matches.map(m => (m.id === matchId ? normalizedRecord : m))
+        : [...matches, normalizedRecord];
+    }
     const approved = approvedMatches(matches);
     if (current && isApprovedMatch(current)) validateScore(current);
     approved.forEach(validateScore);
-    const playerEligibility = assertEligibilityRules(teams, approved, settingsSnap.val()?.eligibilityRules);
+    const playerEligibility = assertEligibilityRules(teams, approved, settingsSnap.val()?.eligibilityRules, { enforce: !isAdminRole(session) });
     const standings = computeStandings(teams, approved); const pprcRatings = buildPtlRatings(teams, approved, ratingsSnap.val() || {}); const histories = computeHistories(teams, approved);
     const updatedBy = session?.teamId || session?.role || 'system'; const meta = { updatedAt: now, updatedBy, version: now };
     const matchUpdates = matchId ? (writeMatchRecord

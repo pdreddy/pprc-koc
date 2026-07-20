@@ -15,6 +15,7 @@ import { DEFAULT_ELIGIBILITY_RULES, normalizeEligibilityRules } from './utils/el
 import BottomNav from './components/BottomNav';
 import AppHeader from './components/Header';
 import { writeAuditLog } from './services/AuditService';
+import { isLockedLineupSubmission } from './utils/lineupSubmissionStatus';
 
 const pageImports = {
   Home:      () => import('./pages/Home'),
@@ -319,7 +320,7 @@ function Shell() {
   useEffect(() => {
     const revealedIds = Object.values(revealedLineups || {}).map(row => row?.scheduleId).filter(Boolean);
     const lockedIds = Object.entries(lineupSubmissionMeta || {})
-      .filter(([, submissions]) => Object.values(submissions || {}).filter(submission => submission?.lockedAt || submission?.revealedAt || submission?.revealId).length >= 2)
+      .filter(([, submissions]) => Object.values(submissions || {}).filter(isLockedLineupSubmission).length >= 2)
       .map(([scheduleId]) => scheduleId);
     const scheduleIds = Array.from(new Set([...revealedIds, ...lockedIds]));
     if (!scheduleIds.length) {

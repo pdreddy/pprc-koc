@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { ref, remove, update } from 'firebase/database';
+import { get, ref, remove, update } from 'firebase/database';
 import { db, ensureAuth, PATHS } from '../firebase';
 import { ScoreProcessingService } from '../services/ScoreProcessingService';
 import { writeAuditLog, recordLineupAudit } from '../services/AuditService';
@@ -11,6 +11,9 @@ import { resolveMatchTeams } from '../utils/matchTeams';
 import { DEFAULT_ELIGIBILITY_RULES, normalizeEligibilityRules } from '../utils/eligibilityRules';
 import { parseQuickScore } from '../utils/quickScoreParser';
 import { regularSetWinner, validateLineScore } from '../utils/tennisScoreRules';
+import { clearLineupScoreMarkers } from '../utils/lineupScoreMarkers';
+import { isLockedLineupSubmission } from '../utils/lineupSubmissionStatus';
+import { archiveScoreSnapshot } from '../utils/scoreArchive';
 import TeamLogo from '../components/TeamLogo';
 import { WhatsAppShareButton } from '../components/WhatsAppIcon';
 
@@ -600,6 +603,52 @@ function SetRow({ idx, set, onChange, disabled, isMatchTieBreak = false, team1Ab
   );
 }
 
+function courtLabelKey(label = '') {
+  const normalized = shareLabel(label).toLowerCase();
+  if (normalized === 's1' || normalized.startsWith('single')) return 'Singles';
+  if (normalized === 'd1' || normalized.includes('doubles 1')) return 'Doubles 1';
+  if (normalized === 'd2' || normalized.includes('doubles 2')) return 'Doubles 2';
+  return label;
+}
+
+function courtFromMatchLine(line, fallbackTemplate = null) {
+  const normalizedLabel = courtLabelKey(line?.label || fallbackTemplate?.label || '');
+  const template = COURT_TEMPLATES.find(t => t.label === normalizedLabel) || fallbackTemplate || { label: normalizedLabel || line?.label || 'Court', type: line?.type === 'singles' ? 'singles' : 'doubles', setCount: line?.type === 'singles' ? 5 : 3 };
+  const sets = newCourt(template.label, template.type, template.setCount).sets.map((set, idx) => {
+    const saved = line?.sets?.[idx];
+    if (!saved) return set;
+    const isMatchTieBreak = typeof saved.matchTieBreak === 'object';
+    return {
+      a: String(isMatchTieBreak ? saved.matchTieBreak.team1 : saved.team1 ?? ''),
+      b: String(isMatchTieBreak ? saved.matchTieBreak.team2 : saved.team2 ?? ''),
+      tieA: saved.tieBreak ? String(saved.tieBreak.team1 ?? '') : '',
+      tieB: saved.tieBreak ? String(saved.tieBreak.team2 ?? '') : ''
+    };
+  });
+  return {
+    label: template.label,
+    type: template.type,
+    p1: [...(line?.players?.team1 || [])],
+    p2: [...(line?.players?.team2 || [])],
+    sets
+  };
+}
+
+export function courtsFromMatch(match) {
+  const linesByLabel = new Map();
+  (match?.lines || []).forEach(line => {
+    const key = courtLabelKey(line.label);
+    const bucket = linesByLabel.get(key) || [];
+    bucket.push(line);
+    linesByLabel.set(key, bucket);
+  });
+  return COURT_TEMPLATES.map(template => {
+    const key = courtLabelKey(template.label);
+    const line = (linesByLabel.get(key) || []).shift();
+    return courtFromMatchLine(line || { label: template.label, type: template.type }, template);
+  });
+}
+
 function computeCourt(c) {
   let g1 = 0, g2 = 0, s1 = 0, s2 = 0;
   const sets = [];
@@ -662,12 +711,16 @@ function validateCourtShape(court, result, validationErrors) {
 }
 
 
+function eligibilityNameKey(playerName) {
+  return String(playerName || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
 function eligibilityPlayerKey(teamId, playerName) {
-  return `${teamId}:${String(playerName || '').trim().toLowerCase()}`;
+  return `${teamId}:${eligibilityNameKey(playerName)}`;
 }
 
 function eligibilityPairKey(teamId, names) {
-  return `${teamId}:${names.map(name => String(name || '').trim().toLowerCase()).sort().join('|')}`;
+  return `${teamId}:${names.map(eligibilityNameKey).sort().join('|')}`;
 }
 
 function incrementPlayerDay(days, teamId, playerName, type) {
@@ -680,10 +733,12 @@ function incrementPlayerDay(days, teamId, playerName, type) {
   days.set(key, row);
 }
 
-function buildExistingEligibility(matches, teams) {
+function buildExistingEligibility(matches, teams, exclude = {}) {
   const playerDays = new Map();
   const partnerDays = new Map();
   (matches || []).forEach((match) => {
+    if (exclude.matchId && match.id === exclude.matchId) return;
+    if (exclude.scheduleId && (match.scheduleId === exclude.scheduleId || match.matchScheduleId === exclude.scheduleId)) return;
     if (match.status && match.status !== 'APPROVED' && match.status !== 'approved') return;
     const { team1, team2 } = resolveMatchTeams(match, teams);
     if (!team1 || !team2) return;
@@ -711,10 +766,10 @@ function buildExistingEligibility(matches, teams) {
   return { playerDays, partnerDays };
 }
 
-function validateEligibilityForLines(lines, team1, team2, matches, teams, eligibilityRules = DEFAULT_ELIGIBILITY_RULES) {
+export function validateEligibilityForLines(lines, team1, team2, matches, teams, eligibilityRules = DEFAULT_ELIGIBILITY_RULES, exclude = {}) {
   const rules = normalizeEligibilityRules(eligibilityRules);
   const errors = [];
-  const existing = buildExistingEligibility(matches, teams);
+  const existing = buildExistingEligibility(matches, teams, exclude);
   const currentPlayers = new Map();
   const currentPairs = new Map();
   (lines || []).forEach((line) => {
@@ -861,7 +916,8 @@ export default function ScoreEntry({ teams, schedule = {}, lineupSubmissions = {
     const params = new URLSearchParams(location.search);
     return {
       scheduleId: params.get('scheduleId') || '',
-      revealId: params.get('revealId') || ''
+      revealId: params.get('revealId') || '',
+      matchId: params.get('matchId') || ''
     };
   }, [location.search]);
   const [sharedTeam1Id, setSharedTeam1IdRaw] = useState('');
@@ -891,6 +947,7 @@ export default function ScoreEntry({ teams, schedule = {}, lineupSubmissions = {
         setTeam2Id={setSharedTeam2Id}
         targetScheduleId={scoreTarget.scheduleId}
         targetRevealId={scoreTarget.revealId}
+        targetMatchId={scoreTarget.matchId}
       />
       {QUICK_PASTE_ENABLED && (
         <QuickEntry
@@ -945,13 +1002,13 @@ function lineupFixtureMatchesTarget(row, targetScheduleId = '', targetRevealId =
     || (!!targetRevealId && [row.revealId, row.revealCode].filter(Boolean).map(String).includes(String(targetRevealId)));
 }
 
-export function scoreLineupFixtures(schedule, revealedLineups, lineupSubmissions, team1Id, team2Id, teams, matches, eligibilityRules) {
+export function scoreLineupFixtures(schedule, revealedLineups, lineupSubmissions, team1Id, team2Id, teams, matches, eligibilityRules, exclude = {}) {
   if (!team1Id || !team2Id) return [];
   const rows = new Map();
   const buildRow = (item, revealId, revealCode, team1Names, team2Names, revealed = true, source = 'revealedLineups') => {
     const lineupLines = buildLineupValidationLines(team1Names, team2Names);
     const eligibilityErrors = team1Names.length === 5 && team2Names.length === 5
-      ? validateEligibilityForLines(lineupLines, teams[team1Id], teams[team2Id], matches, teams, eligibilityRules)
+      ? validateEligibilityForLines(lineupLines, teams[team1Id], teams[team2Id], matches, teams, eligibilityRules, { ...exclude, scheduleId: exclude.scheduleId || item?.id })
       : [];
     return { item, revealId, revealCode, revealed, source, team1Names, team2Names, eligibilityErrors, ready: team1Names.length === 5 && team2Names.length === 5 };
   };
@@ -974,12 +1031,12 @@ export function scoreLineupFixtures(schedule, revealedLineups, lineupSubmissions
     if (rows.has(scheduleId)) return;
     const mine = submissions?.[team1Id];
     const theirs = submissions?.[team2Id];
-    if (!mine?.lockedAt || !theirs?.lockedAt || mine?.unlockedAt || theirs?.unlockedAt) return;
+    if (!isLockedLineupSubmission(mine) || !isLockedLineupSubmission(theirs)) return;
     const team1Names = submittedLineupNames(mine, teams[team1Id]);
     const team2Names = submittedLineupNames(theirs, teams[team2Id]);
     if (team1Names.length !== 5 || team2Names.length !== 5) return;
     const item = schedule?.[scheduleId] || { id: scheduleId, team1Id: mine.teamId || team1Id, team2Id: theirs.teamId || team2Id };
-    const revealId = mine.revealId || theirs.revealId || `locked-${scheduleId}-${Math.max(Number(mine.lockedAt) || 0, Number(theirs.lockedAt) || 0)}`;
+    const revealId = mine.revealId || theirs.revealId || `locked-${scheduleId}-${Math.max(Number(mine.lockedAt || mine.submittedAt) || 0, Number(theirs.lockedAt || theirs.submittedAt) || 0)}`;
     rows.set(scheduleId, buildRow(item, revealId, revealId, team1Names, team2Names, false, 'lockedSubmissions'));
   });
 
@@ -1004,7 +1061,7 @@ async function markLineupConvertedToScore(record, session) {
   if (Object.keys(updates).length) await update(ref(db), updates);
 }
 
-function ScoreLineupLoader({ fixtures, teams, selectedId, onSelectedId, onLoad, mode }) {
+function ScoreLineupLoader({ fixtures, teams, selectedId, onSelectedId, onLoad, mode, suppressEligibilityWarnings = false }) {
   if (!fixtures.length) return null;
   const selected = fixtures.find(row => [row.revealId, row.revealCode, row.item?.id].filter(Boolean).map(String).includes(String(selectedId))) || fixtures[0];
   const { item, ready, revealed, eligibilityErrors = [] } = selected;
@@ -1027,12 +1084,12 @@ function ScoreLineupLoader({ fixtures, teams, selectedId, onSelectedId, onLoad, 
         <button className="btn small success" type="button" disabled={!ready} onClick={() => onLoad(selected)} data-testid={`${mode}-load-submitted-lineup`}>Load submitted lines</button>
       </div>
       <p className="hint">{team1?.name || 'Team 1'} vs {team2?.name || 'Team 2'} · {revealed ? (ready ? 'Revealed and ready to load into score entry.' : 'Revealed, but submitted lineup data is incomplete.') : (ready ? 'Both lineups are locked and ready while the reveal record syncs.' : 'Waiting for both captains to submit before line details are available.')}</p>
-      {eligibilityErrors.length > 0 && <div className="error-box" style={{ whiteSpace: 'pre-line', marginTop: '.65rem' }} data-testid={`${mode}-revealed-lineup-eligibility-error`}>Eligibility warning — lines can still be loaded, but save will re-check these rules:\n{eligibilityErrors.join('\n')}</div>}
+      {!suppressEligibilityWarnings && eligibilityErrors.length > 0 && <div className="error-box" style={{ whiteSpace: 'pre-line', marginTop: '.65rem' }} data-testid={`${mode}-revealed-lineup-eligibility-error`}>Eligibility warning — lines can still be loaded, but save will re-check these rules:\n{eligibilityErrors.join('\n')}</div>}
     </div>
   );
 }
 
-function FormEntry({ teams, matches, schedule, lineupSubmissions, revealedLineups, eligibilityRules, onScoreSaved, team1Id, setTeam1Id, team2Id, setTeam2Id, targetScheduleId = '', targetRevealId = '' }) {
+function FormEntry({ teams, matches, schedule, lineupSubmissions, revealedLineups, eligibilityRules, onScoreSaved, team1Id, setTeam1Id, team2Id, setTeam2Id, targetScheduleId = '', targetRevealId = '', targetMatchId = '' }) {
   const { session } = useAuth();
   const teamList = Object.values(teams || {});
   const myTeam = session.role === ROLES.CAPTAIN ? teams[session.teamId] : null;
@@ -1047,11 +1104,13 @@ function FormEntry({ teams, matches, schedule, lineupSubmissions, revealedLineup
   const [pendingRecord, setPendingRecord] = useState(null);
   const [saving, setSaving] = useState(false);
   const [selectedScheduleId, setSelectedScheduleId] = useState('');
+  const [targetScheduleSubmissions, setTargetScheduleSubmissions] = useState(null);
   const [autoLoadedRevealId, setAutoLoadedRevealId] = useState('');
   const [loadedLineupFixture, setLoadedLineupFixture] = useState(null);
   const [visibleSetCounts, setVisibleSetCounts] = useState({});
   const [collapsedCourts, setCollapsedCourts] = useState({});
   const [editingCollapsedCourts, setEditingCollapsedCourts] = useState({});
+  const [editingMatchId, setEditingMatchId] = useState('');
 
   useEffect(() => {
     if (myTeam?.id && !team1Id) setTeam1Id(myTeam.id);
@@ -1073,11 +1132,49 @@ function FormEntry({ teams, matches, schedule, lineupSubmissions, revealedLineup
     }
   }, [targetScheduleId, schedule, myTeam, team1Id, team2Id, setTeam1Id, setTeam2Id]);
 
+  useEffect(() => {
+    if (!targetMatchId || targetScheduleId) return;
+    const match = (matches || []).find(row => row.id === targetMatchId);
+    if (!match?.t1Id || !match?.t2Id) return;
+    if (team1Id !== match.t1Id) setTeam1Id(match.t1Id);
+    if (team2Id !== match.t2Id) setTeam2Id(match.t2Id);
+  }, [targetMatchId, targetScheduleId, matches, team1Id, team2Id, setTeam1Id, setTeam2Id]);
+
   const team1 = teams[team1Id];
   const team2 = teams[team2Id];
   const opponentList = groupFilteredOpponents(teamList, team1);
   const targetFixture = targetScheduleId ? schedule?.[targetScheduleId] : null;
-  const submittedLineupFixtures = useMemo(() => scoreLineupFixtures(schedule, revealedLineups, lineupSubmissions, team1Id, team2Id, teams, matches, eligibilityRules), [schedule, revealedLineups, lineupSubmissions, team1Id, team2Id, teams, matches, eligibilityRules]);
+  useEffect(() => {
+    if (!targetScheduleId) {
+      setTargetScheduleSubmissions(null);
+      return undefined;
+    }
+    const current = lineupSubmissions?.[targetScheduleId] || {};
+    const hasFullLineups = Object.values(current).some(submission => Array.isArray(submission?.lineup) && submission.lineup.length > 0);
+    if (hasFullLineups) {
+      setTargetScheduleSubmissions(null);
+      return undefined;
+    }
+    let cancelled = false;
+    get(ref(db, `${PATHS.lineupSubmissions}/${targetScheduleId}`))
+      .then(snap => { if (!cancelled) setTargetScheduleSubmissions(snap.val() || null); })
+      .catch(() => { if (!cancelled) setTargetScheduleSubmissions(null); });
+    return () => { cancelled = true; };
+  }, [targetScheduleId, lineupSubmissions]);
+
+  const effectiveLineupSubmissions = useMemo(() => {
+    if (!targetScheduleId || !targetScheduleSubmissions) return lineupSubmissions;
+    return { ...lineupSubmissions, [targetScheduleId]: { ...(lineupSubmissions?.[targetScheduleId] || {}), ...targetScheduleSubmissions } };
+  }, [lineupSubmissions, targetScheduleId, targetScheduleSubmissions]);
+
+  const submittedLineupFixtures = useMemo(() => scoreLineupFixtures(schedule, revealedLineups, effectiveLineupSubmissions, team1Id, team2Id, teams, matches, eligibilityRules, { matchId: targetMatchId, scheduleId: targetScheduleId }), [schedule, revealedLineups, effectiveLineupSubmissions, team1Id, team2Id, teams, matches, eligibilityRules, targetMatchId, targetScheduleId]);
+
+  const scheduleMatchId = loadedLineupFixture?.item?.id || targetScheduleId;
+  const existingMatch = useMemo(() => {
+    if (targetMatchId) return (matches || []).find(m => m.id === targetMatchId) || null;
+    if (!scheduleMatchId) return null;
+    return (matches || []).find(m => m.scheduleId === scheduleMatchId || m.matchScheduleId === scheduleMatchId) || null;
+  }, [targetMatchId, scheduleMatchId, matches]);
 
   // Clear form state when teams change (user explicitly picks different teams)
   const prevTeamPairRef = useRef('');
@@ -1097,6 +1194,7 @@ function FormEntry({ teams, matches, schedule, lineupSubmissions, revealedLineup
   }, [team1Id, team2Id, team1, team2, targetScheduleId, schedule, myTeam, setTeam2Id]);
 
   useEffect(() => {
+    if (targetMatchId) return;
     const exact = submittedLineupFixtures.find(row => lineupFixtureMatchesTarget(row, targetScheduleId, targetRevealId));
     const target = exact || (submittedLineupFixtures.length === 1 ? submittedLineupFixtures[0] : null);
     if (!target?.ready || autoLoadedRevealId === target.revealId) return;
@@ -1110,10 +1208,10 @@ function FormEntry({ teams, matches, schedule, lineupSubmissions, revealedLineup
     // Show validation status after lineup loads
     if (session.role === ROLES.CAPTAIN) {
       const schedId = target.item?.id;
-      const mySubmission = schedId ? lineupSubmissions?.[schedId]?.[session.teamId] : null;
+      const mySubmission = schedId ? effectiveLineupSubmissions?.[schedId]?.[session.teamId] : null;
       const fixture = schedId ? schedule?.[schedId] : null;
       const isPlayoff = fixture?.matchType === 'playoff' || !fixture?.group;
-      if (!isPlayoff && mySubmission?.scoreSavedAt) {
+      if (!isPlayoff && mySubmission?.scoreSavedAt && existingMatch) {
         setError('⚠️ You have already submitted a score for this match. Only one score submission is allowed per team per round-robin match.');
         setSuccess('');
       } else {
@@ -1124,7 +1222,7 @@ function FormEntry({ teams, matches, schedule, lineupSubmissions, revealedLineup
       setSuccess(`Loaded submitted dashboard lineup for schedule code ${target.revealCode || fixtureCode(target.item)}.`);
       setError('');
     }
-  }, [submittedLineupFixtures, autoLoadedRevealId, session, team1Id, targetScheduleId, targetRevealId, lineupSubmissions, schedule]);
+  }, [submittedLineupFixtures, autoLoadedRevealId, session, team1Id, targetScheduleId, targetRevealId, targetMatchId, effectiveLineupSubmissions, schedule, existingMatch]);
 
   const updateCourt = (idx, patch) => {
     setPendingRecord(null);
@@ -1139,32 +1237,42 @@ function FormEntry({ teams, matches, schedule, lineupSubmissions, revealedLineup
     setCourts(cs => cs.map((c, i) => i === idx ? { ...c, ...patch } : c));
   };
 
-  // Determine if save should be blocked for captain (lines not submitted, or score already saved for RR match)
+  // Determine if save should be blocked for captain (lines not submitted, or an actual score record already exists).
+  // Stale scoreSavedAt markers can remain after manual deletes; those markers should not block re-entry when no match exists.
   const scoreBlocked = useMemo(() => {
     if (session.role !== ROLES.CAPTAIN) return false;
-    const schedId = loadedLineupFixture?.item?.id || targetScheduleId;
+    const schedId = scheduleMatchId;
     if (!schedId) return false;
-    const mySubmission = lineupSubmissions?.[schedId]?.[session.teamId];
-    if (!mySubmission?.lockedAt) return true;
+    const mySubmission = effectiveLineupSubmissions?.[schedId]?.[session.teamId];
+    if (!isLockedLineupSubmission(mySubmission)) return true;
     const fixture = schedule?.[schedId];
     const isPlayoff = fixture?.matchType === 'playoff' || !fixture?.group;
-    if (!isPlayoff && mySubmission?.scoreSavedAt) return true;
+    if (!isPlayoff && mySubmission?.scoreSavedAt && existingMatch) return true;
     return false;
-  }, [session, loadedLineupFixture, targetScheduleId, lineupSubmissions, schedule]);
+  }, [session, scheduleMatchId, effectiveLineupSubmissions, schedule, existingMatch]);
 
-  // Find existing submitted match record for this schedule to display read-only.
-  // Captains only see this once they're blocked from re-submitting; admins can see
-  // it (and reset it, see canDeleteMatch below) any time the schedule already has a result.
-  const existingMatch = useMemo(() => {
-    const schedId = loadedLineupFixture?.item?.id || targetScheduleId;
-    if (!schedId) return null;
-    if (session.role === ROLES.CAPTAIN) {
-      if (!scoreBlocked) return null;
-      const mySubmission = lineupSubmissions?.[schedId]?.[session.teamId];
-      if (!mySubmission?.scoreSavedAt) return null;
-    }
-    return (matches || []).find(m => m.scheduleId === schedId || m.matchScheduleId === schedId) || null;
-  }, [scoreBlocked, loadedLineupFixture, targetScheduleId, lineupSubmissions, session, matches]);
+  const displayExistingMatch = existingMatch && editingMatchId !== existingMatch.id;
+
+  const startEditExistingScore = () => {
+    if (!existingMatch) return;
+    setCourts(courtsFromMatch(existingMatch));
+    setLoadedLineupFixture(previous => {
+      const editScheduleId = existingMatch.scheduleId || existingMatch.matchScheduleId;
+      return previous || (editScheduleId ? { item: schedule?.[editScheduleId] || { id: editScheduleId, team1Id: existingMatch.t1Id, team2Id: existingMatch.t2Id }, revealId: existingMatch.revealId, revealCode: existingMatch.revealCode, source: existingMatch.lineupSource || 'existingMatch', ready: true } : null);
+    });
+    setEditingMatchId(existingMatch.id);
+    setError('');
+    setSuccess('Editing saved score. Review/correct the courts below, then preview and save.');
+    setShareText('');
+    setPendingRecord(null);
+    setCollapsedCourts({});
+    setEditingCollapsedCourts({});
+  };
+
+  useEffect(() => {
+    if (!targetMatchId || !existingMatch || !isAdmin || editingMatchId === existingMatch.id) return;
+    startEditExistingScore();
+  }, [targetMatchId, existingMatch, isAdmin, editingMatchId]);
 
   const [resettingScore, setResettingScore] = useState(false);
   const handleResetScore = async () => {
@@ -1174,18 +1282,10 @@ function FormEntry({ teams, matches, schedule, lineupSubmissions, revealedLineup
     try {
       setResettingScore(true);
       await ensureAuth();
+      await archiveScoreSnapshot({ ...existingMatch, id: existingMatch.id }, { action: 'reset', session, reason: 'Reset from Score Entry' });
       await remove(ref(db, `${PATHS.matches}/${existingMatch.id}`));
       await ScoreProcessingService.processMatchResult(null, { session, matchRecord: { ...existingMatch, id: existingMatch.id } });
-      if (schedId) {
-        const clearUpdates = {};
-        [existingMatch.t1Id, existingMatch.t2Id].filter(Boolean).forEach(teamId => {
-          clearUpdates[`${PATHS.lineupSubmissions}/${schedId}/${teamId}/scoreSavedAt`] = null;
-          clearUpdates[`${PATHS.lineupSubmissions}/${schedId}/${teamId}/convertedToScoreAt`] = null;
-          clearUpdates[`${PATHS.lineupSubmissionMeta}/${schedId}/${teamId}/scoreSavedAt`] = null;
-          clearUpdates[`${PATHS.lineupSubmissionMeta}/${schedId}/${teamId}/convertedToScoreAt`] = null;
-        });
-        await update(ref(db), clearUpdates);
-      }
+      await clearLineupScoreMarkers({ ...existingMatch, scheduleId: schedId || existingMatch.scheduleId });
       await writeAuditLog({ actionType: 'Score Reset', session, targetType: 'match', targetId: existingMatch.id, oldValue: existingMatch });
       setSuccess('Score reset. Re-enter and save the corrected result below.');
     } catch (e) {
@@ -1259,8 +1359,8 @@ function FormEntry({ teams, matches, schedule, lineupSubmissions, revealedLineup
     // Lines must be submitted before score entry (captains only)
     if (session.role === ROLES.CAPTAIN) {
       const schedId = loadedLineupFixture?.item?.id || targetScheduleId;
-      const mySubmission = schedId ? lineupSubmissions?.[schedId]?.[session.teamId] : null;
-      if (!mySubmission?.lockedAt) {
+      const mySubmission = schedId ? effectiveLineupSubmissions?.[schedId]?.[session.teamId] : null;
+      if (!isLockedLineupSubmission(mySubmission)) {
         setError('Lines must be submitted and locked before entering a score. Please submit your lineup first.');
         return;
       }
@@ -1268,7 +1368,7 @@ function FormEntry({ teams, matches, schedule, lineupSubmissions, revealedLineup
       // One score per team per schedule in round-robin (playoff/final matches are exempt)
       const fixture = schedId ? schedule?.[schedId] : null;
       const isPlayoff = fixture?.matchType === 'playoff' || !fixture?.group;
-      if (!isPlayoff && mySubmission?.scoreSavedAt) {
+      if (!isPlayoff && mySubmission?.scoreSavedAt && existingMatch) {
         setError('You have already submitted a score for this match. Only one score submission is allowed per team per round-robin match.');
         return;
       }
@@ -1303,7 +1403,7 @@ function FormEntry({ teams, matches, schedule, lineupSubmissions, revealedLineup
           }
           const m = matchName(trimmed, team.players || []);
           if (!m.exact && !m.matched) {
-            addValidationError(`${c.label}: "${trimmed}" not found in ${team.name}`, c.label);
+            if (!isAdmin) addValidationError(`${c.label}: "${trimmed}" not found in ${team.name}`, c.label);
             return trimmed;
           }
           return (m.matched || { name: trimmed }).name;
@@ -1329,7 +1429,7 @@ function FormEntry({ teams, matches, schedule, lineupSubmissions, revealedLineup
       setError('Please enter at least one court with scores.');
       return;
     }
-    validateEligibilityForLines(lines, team1, team2, matches, teams, eligibilityRules).forEach(message => addValidationError(message));
+    if (!isAdmin) validateEligibilityForLines(lines, team1, team2, matches, teams, eligibilityRules, { matchId: editingMatchId || targetMatchId, scheduleId: loadedLineupFixture?.item?.id || targetScheduleId || existingMatch?.scheduleId || existingMatch?.matchScheduleId }).forEach(message => addValidationError(message));
     if (validationErrors.length > 0) {
       setFieldErrors(nextFieldErrors);
       setError(validationErrors.join('\n'));
@@ -1358,11 +1458,11 @@ function FormEntry({ teams, matches, schedule, lineupSubmissions, revealedLineup
       updatedAt: Date.now(),
       updatedBy: session.teamId || session.role,
       approvedBy: session.role,
-      scheduleId: loadedLineupFixture?.item?.id || null,
-      matchScheduleId: loadedLineupFixture?.item?.id || null,
-      revealId: loadedLineupFixture?.revealId || null,
-      revealCode: loadedLineupFixture?.revealCode || null,
-      lineupSource: loadedLineupFixture?.source || (loadedLineupFixture ? 'revealedLineups' : 'manual'),
+      scheduleId: loadedLineupFixture?.item?.id || existingMatch?.scheduleId || existingMatch?.matchScheduleId || null,
+      matchScheduleId: loadedLineupFixture?.item?.id || existingMatch?.matchScheduleId || existingMatch?.scheduleId || null,
+      revealId: loadedLineupFixture?.revealId || existingMatch?.revealId || null,
+      revealCode: loadedLineupFixture?.revealCode || existingMatch?.revealCode || null,
+      lineupSource: loadedLineupFixture?.source || existingMatch?.lineupSource || (loadedLineupFixture ? 'revealedLineups' : 'manual'),
       lines
     };
 
@@ -1376,14 +1476,22 @@ function FormEntry({ teams, matches, schedule, lineupSubmissions, revealedLineup
     try {
       setSaving(true);
       await ensureAuth();
-      const saved = await ScoreProcessingService.updateAfterScoreEntry(pendingRecord, { session });
+      const saved = editingMatchId
+        ? { key: editingMatchId, matchRecord: { ...pendingRecord, id: editingMatchId } }
+        : await ScoreProcessingService.updateAfterScoreEntry(pendingRecord, { session });
+      if (editingMatchId) await ScoreProcessingService.processMatchResult(editingMatchId, { session, matchRecord: saved.matchRecord, writeMatchRecord: true });
       await markLineupConvertedToScore(pendingRecord, session);
-      const savedRecord = { ...saved.matchRecord, scheduleId: pendingRecord.scheduleId, matchScheduleId: pendingRecord.matchScheduleId, revealId: pendingRecord.revealId, revealCode: pendingRecord.revealCode, lineupSource: pendingRecord.lineupSource };
+      if (pendingRecord.scheduleId) {
+        await update(ref(db, `${PATHS.schedule}/${pendingRecord.scheduleId}`), { status: 'completed', completedAt: pendingRecord.updatedAt || Date.now(), scoreMatchId: saved.key }).catch(error => console.warn('Schedule score sync skipped:', error?.message || error));
+      }
+      const savedRecord = { ...saved.matchRecord, id: saved.key, scheduleId: pendingRecord.scheduleId, matchScheduleId: pendingRecord.matchScheduleId, revealId: pendingRecord.revealId, revealCode: pendingRecord.revealCode, lineupSource: pendingRecord.lineupSource };
+      await archiveScoreSnapshot(savedRecord, { action: editingMatchId ? 'edit' : 'save', session, reason: editingMatchId ? 'Edited from Score Entry' : 'Saved from Score Entry' });
       onScoreSaved?.(savedRecord);
-      await writeAuditLog({ actionType: 'Score Entry', session, targetType: 'match', targetId: saved.key, newValue: savedRecord });
+      await writeAuditLog({ actionType: editingMatchId ? 'Score Edit' : 'Score Entry', session, targetType: 'match', targetId: saved.key, newValue: savedRecord, oldValue: editingMatchId ? existingMatch : undefined });
       setSuccess(`✅ Saved and synchronized ratings, standings, histories, and dashboard:  ${pendingRecord.t1} vs ${pendingRecord.t2} — Winner: ${pendingRecord.win}`);
       setShareText(formatMatchShareText(savedRecord));
       setPendingRecord(null);
+      setEditingMatchId('');
       setVisibleSetCounts({});
       setCollapsedCourts({});
       setEditingCollapsedCourts({});
@@ -1462,6 +1570,7 @@ function FormEntry({ teams, matches, schedule, lineupSubmissions, revealedLineup
           selectedId={selectedScheduleId || targetRevealId || targetScheduleId}
           onSelectedId={setSelectedScheduleId}
           mode="form"
+          suppressEligibilityWarnings={isAdmin}
           onLoad={(row) => { setCourts(buildLineupCourts(row.team1Names, row.team2Names)); setLoadedLineupFixture(row); recordLineupAudit({ actionType: 'Lineup Loaded For Score Entry', session, scheduleId: row.item.id, teamId: session.teamId || team1Id, metadata: { revealId: row.revealId, revealCode: row.revealCode, viewedAt: Date.now() } }).catch(() => {}); setError(''); setSuccess(`Loaded submitted dashboard lineup for schedule code ${fixtureCode(row.item)}.`); setShareText(''); setPendingRecord(null); }}
         />
       )}
@@ -1474,7 +1583,7 @@ function FormEntry({ teams, matches, schedule, lineupSubmissions, revealedLineup
         </div>
       )}
 
-      {existingMatch && (
+      {displayExistingMatch && (
         <div className="card" style={{ border: '1.5px solid #10b981', background: '#f0fdf4' }} data-testid="score-already-submitted-summary">
           <h2 style={{ marginTop: 0, color: '#065f46' }}>✅ Score Already Submitted</h2>
           <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap', marginBottom: '.75rem' }}>
@@ -1500,7 +1609,10 @@ function FormEntry({ teams, matches, schedule, lineupSubmissions, revealedLineup
             <ShareResultPreview text={formatMatchShareText(existingMatch)} compact />
           </div>
           {canDeleteMatch(session) ? (
-            <div style={{ marginTop: '.75rem' }}>
+            <div style={{ marginTop: '.75rem', display: 'flex', gap: '.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+              <button type="button" className="btn small success" onClick={startEditExistingScore} data-testid="edit-existing-score-btn">
+                Edit score (Super Admin)
+              </button>
               <button type="button" className="btn small danger" onClick={handleResetScore} disabled={resettingScore} data-testid="reset-existing-score-btn">
                 {resettingScore ? 'Resetting…' : 'Reset score (Super Admin)'}
               </button>
@@ -1512,14 +1624,14 @@ function FormEntry({ teams, matches, schedule, lineupSubmissions, revealedLineup
         </div>
       )}
 
-      {team1 && team2 && !scoreBlocked && !existingMatch && submittedLineupFixtures.length === 0 && (
+      {team1 && team2 && !scoreBlocked && !displayExistingMatch && submittedLineupFixtures.length === 0 && (
         <div className="card score-lineup-loader" data-testid="form-score-lineup-pending">
           <h2>Lineups Not Submitted</h2>
           <p className="hint">Score lines are loaded only after both captains submit and lock their dashboard lineups. Manual lineup selection is no longer available on Score Entry.</p>
         </div>
       )}
 
-      {team1 && team2 && !scoreBlocked && !existingMatch && courts.map((c, idx) => {
+      {team1 && team2 && !scoreBlocked && !displayExistingMatch && courts.map((c, idx) => {
         const status = courtCompletion(c);
         const result = computeCourt(c);
         const winnerName = result.winnerTeamNum === 1 ? team1.name : (result.winnerTeamNum === 2 ? team2.name : 'Winner pending');
@@ -1653,6 +1765,7 @@ function QuickEntry({ teams, matches, schedule, lineupSubmissions, revealedLineu
   const [pendingRecord, setPendingRecord] = useState(null);
   const [saving, setSaving] = useState(false);
   const [selectedScheduleId, setSelectedScheduleId] = useState('');
+  const [targetScheduleSubmissions, setTargetScheduleSubmissions] = useState(null);
   const [autoLoadedRevealId, setAutoLoadedRevealId] = useState('');
   const [loadedLineupFixture, setLoadedLineupFixture] = useState(null);
   const teamList = Object.values(teams || {});
@@ -1761,7 +1874,7 @@ function QuickEntry({ teams, matches, schedule, lineupSubmissions, revealedLineu
     const scoreErrors = lines.flatMap(line => validateLineScore(line));
     if (scoreErrors.length > 0) { setError(scoreErrors.join('\n')); return; }
 
-    const eligibilityErrors = validateEligibilityForLines(lines, team1, team2, matches, teams, eligibilityRules);
+    const eligibilityErrors = validateEligibilityForLines(lines, team1, team2, matches, teams, eligibilityRules, { scheduleId: loadedLineupFixture?.item?.id });
     if (eligibilityErrors.length > 0) { setError(eligibilityErrors.join('\n')); return; }
 
     const winner = w1 > w2 ? team1.name : (w2 > w1 ? team2.name : null);
@@ -1803,7 +1916,8 @@ function QuickEntry({ teams, matches, schedule, lineupSubmissions, revealedLineu
       await ensureAuth();
       const saved = await ScoreProcessingService.updateAfterScoreEntry(pendingRecord, { session });
       await markLineupConvertedToScore(pendingRecord, session);
-      const savedRecord = { ...saved.matchRecord, scheduleId: pendingRecord.scheduleId, matchScheduleId: pendingRecord.matchScheduleId, revealId: pendingRecord.revealId, revealCode: pendingRecord.revealCode, lineupSource: pendingRecord.lineupSource };
+      const savedRecord = { ...saved.matchRecord, id: saved.key, scheduleId: pendingRecord.scheduleId, matchScheduleId: pendingRecord.matchScheduleId, revealId: pendingRecord.revealId, revealCode: pendingRecord.revealCode, lineupSource: pendingRecord.lineupSource };
+      await archiveScoreSnapshot(savedRecord, { action: 'save', session, reason: 'Saved from Quick Score Entry' });
       onScoreSaved?.(savedRecord);
       await writeAuditLog({ actionType: 'Score Entry', session, targetType: 'match', targetId: saved.key, newValue: savedRecord });
       setSuccess(`✅ Saved and synchronized ratings, standings, histories, and dashboard:  ${pendingRecord.t1} vs ${pendingRecord.t2} — Winner: ${pendingRecord.win}`);

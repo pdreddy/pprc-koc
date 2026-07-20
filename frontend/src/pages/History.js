@@ -1,8 +1,11 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { ref, remove } from 'firebase/database';
+import { ref, remove, update } from 'firebase/database';
 import { db, PATHS } from '../firebase';
 import { ScoreProcessingService } from '../services/ScoreProcessingService';
+import { clearLineupScoreMarkers } from '../utils/lineupScoreMarkers';
+import { archiveScoreSnapshot } from '../utils/scoreArchive';
 import { writeAuditLog } from '../services/AuditService';
 import { isAdminRole } from '../utils/roles';
 import { matchTeamNames, matchWinnerId } from '../utils/matchTeams';
@@ -20,7 +23,11 @@ export default function History({ matches, teams, onMatchDeleted }) {
   const handleDelete = async (m, names) => {
     if (!window.confirm(`Delete match ${names.t1Name} vs ${names.t2Name}?`)) return;
     try {
+      await archiveScoreSnapshot({ ...m, id: m.id }, { action: 'delete', session, reason: 'Deleted from Match History' });
       await remove(ref(db, `${PATHS.matches}/${m.id}`));
+      await clearLineupScoreMarkers({ ...m, id: m.id });
+      const scheduleId = m.scheduleId || m.matchScheduleId;
+      if (scheduleId) await update(ref(db, `${PATHS.schedule}/${scheduleId}`), { status: null, completedAt: null, scoreMatchId: null }).catch(error => console.warn('Schedule delete sync skipped:', error?.message || error));
       onMatchDeleted?.(m.id);
       await ScoreProcessingService.processMatchResult(null, { session, matchRecord: { ...m, id: m.id } });
       await writeAuditLog({ actionType: 'Score Delete', session, targetType: 'match', targetId: m.id, oldValue: m });
@@ -83,14 +90,22 @@ export default function History({ matches, teams, onMatchDeleted }) {
               </>
             )}
             {isAdminRole(session) && (
-              <button
-                className="btn small danger"
-                style={{ marginTop: '.5rem', marginLeft: '.4rem' }}
-                onClick={() => handleDelete(m, names)}
-                data-testid={`match-delete-${m.id}`}
-              >
-                Delete
-              </button>
+              <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap', marginTop: '.5rem', marginLeft: '.4rem' }}>
+                <Link
+                  className="btn small success"
+                  to={`/score?matchId=${encodeURIComponent(m.id)}${(m.scheduleId || m.matchScheduleId) ? `&scheduleId=${encodeURIComponent(m.scheduleId || m.matchScheduleId)}` : ''}`}
+                  data-testid={`match-edit-${m.id}`}
+                >
+                  Edit Score
+                </Link>
+                <button
+                  className="btn small danger"
+                  onClick={() => handleDelete(m, names)}
+                  data-testid={`match-delete-${m.id}`}
+                >
+                  Delete
+                </button>
+              </div>
             )}
           </div>
         );
